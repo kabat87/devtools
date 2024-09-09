@@ -1,7 +1,11 @@
 // this script is called when the VueDevtools panel is activated.
 
 import { initDevTools, setAppConnected } from '@front'
-import { Bridge } from '@vue-devtools/shared-utils'
+import { Bridge, BridgeEvents } from '@vue-devtools/shared-utils'
+
+let disconnected = false
+let connectCount = 0
+let retryConnectTimer
 
 initDevTools({
 
@@ -11,24 +15,51 @@ initDevTools({
    * @param {Function} cb
    */
 
-  connect (cb) {
+  connect(cb) {
     // 1. inject backend code into page
     injectScript(chrome.runtime.getURL('build/backend.js'), () => {
       // 2. connect to background to setup proxy
-      const port = chrome.runtime.connect({
-        name: '' + chrome.devtools.inspectedWindow.tabId,
-      })
-      let disconnected = false
-      port.onDisconnect.addListener(() => {
-        disconnected = true
-        setAppConnected(false)
-      })
+      let port
+
+      const onMessageHandlers = []
+
+      function connect() {
+        try {
+          clearTimeout(retryConnectTimer)
+          connectCount++
+          port = chrome.runtime.connect({
+            name: `${chrome.devtools.inspectedWindow.tabId}`,
+          })
+          disconnected = false
+          port.onDisconnect.addListener(() => {
+            disconnected = true
+            setAppConnected(false)
+
+            // Retry
+            retryConnectTimer = setTimeout(connect, 500)
+          })
+
+          if (connectCount > 1) {
+            onMessageHandlers.forEach(fn => port.onMessage.addListener(fn))
+          }
+        }
+        catch (e) {
+          console.error(e)
+          disconnected = true
+          setAppConnected(false)
+
+          // Retry
+          retryConnectTimer = setTimeout(connect, 1000)
+        }
+      }
+      connect()
 
       const bridge = new Bridge({
-        listen (fn) {
+        listen(fn) {
           port.onMessage.addListener(fn)
+          onMessageHandlers.push(fn)
         },
-        send (data) {
+        send(data) {
           if (!disconnected) {
             // if (process.env.NODE_ENV !== 'production') {
             //   console.log('[chrome] devtools -> backend', data)
@@ -37,6 +68,11 @@ initDevTools({
           }
         },
       })
+
+      bridge.on(BridgeEvents.TO_FRONT_RECONNECTED, () => {
+        setAppConnected(true)
+      })
+
       // 3. send a proxy API to the panel
       cb(bridge)
     })
@@ -48,7 +84,7 @@ initDevTools({
    * @param {Function} reloadFn
    */
 
-  onReload (reloadFn) {
+  onReload(reloadFn) {
     chrome.devtools.network.onNavigated.addListener(reloadFn)
   },
 })
@@ -57,11 +93,11 @@ initDevTools({
  * Inject a globally evaluated script, in the same context with the actual
  * user app.
  *
- * @param {String} scriptName
+ * @param {string} scriptName
  * @param {Function} cb
  */
 
-function injectScript (scriptName, cb) {
+function injectScript(scriptName, cb) {
   const src = `
     (function() {
       var script = document.constructor.prototype.createElement.call(document, 'script');
@@ -70,7 +106,7 @@ function injectScript (scriptName, cb) {
       script.parentNode.removeChild(script);
     })()
   `
-  chrome.devtools.inspectedWindow.eval(src, function (res, err) {
+  chrome.devtools.inspectedWindow.eval(src, (res, err) => {
     if (err) {
       console.error(err)
     }

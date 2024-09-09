@@ -1,29 +1,28 @@
 <script lang="ts">
+import { defineComponent, onMounted } from 'vue'
+import {
+  SharedData,
+  getStorage,
+  isChrome,
+  onSharedDataInit,
+  setStorage,
+  watchSharedData,
+} from '@vue-devtools/shared-utils'
+import { darkMode } from '@front/util/theme'
 import AppHeader from './header/AppHeader.vue'
 import AppConnecting from './connection/AppConnecting.vue'
 import AppDisconnected from './connection/AppDisconnected.vue'
 import ErrorOverlay from './error/ErrorOverlay.vue'
-import WelcomeSlideshow from './welcome/WelcomeSlideshow.vue'
 import SplitPane from './layout/SplitPane.vue'
 import AppSelectPane from './apps/AppSelectPane.vue'
 
-import { onMounted, defineComponent, ref, watch } from '@vue/composition-api'
-import {
-  isChrome,
-  setStorage,
-  getStorage,
-  SharedData,
-  watchSharedData,
-  onSharedDataInit,
-} from '@vue-devtools/shared-utils'
-import { darkMode } from '@front/util/theme'
 import { useAppConnection } from './connection'
 import { showAppsSelector } from './header/header'
+import { useOrientation } from './layout/orientation'
 
 const chromeTheme = isChrome ? chrome.devtools.panels.themeName : undefined
 
 const STORAGE_PREVIOUS_SESSION_THEME = 'previous-session-theme'
-const STORAGE_WELCOME_HIDDEN = 'welcome-hidden'
 
 export default defineComponent({
   name: 'App',
@@ -33,27 +32,28 @@ export default defineComponent({
     AppConnecting,
     AppDisconnected,
     ErrorOverlay,
-    WelcomeSlideshow,
     SplitPane,
     AppSelectPane,
   },
 
-  setup () {
-    const { isConnected, isInitializing } = useAppConnection()
+  setup() {
+    const { isConnected, isInitializing, showDisplayDisconnected, reloadTimes } = useAppConnection()
 
-    function updateTheme (theme: string) {
+    function updateTheme(theme: string) {
       if (theme === 'dark' || theme === 'high-contrast' || (theme === 'auto' && chromeTheme === 'dark')) {
         document.body.classList.add('vue-ui-dark-mode')
         document.body.classList.add('dark')
         darkMode.value = true
-      } else {
+      }
+      else {
         document.body.classList.remove('vue-ui-dark-mode')
         document.body.classList.remove('dark')
         darkMode.value = false
       }
       if (theme === 'high-contrast') {
         document.body.classList.add('vue-ui-high-contrast')
-      } else {
+      }
+      else {
         document.body.classList.remove('vue-ui-high-contrast')
       }
       setStorage(STORAGE_PREVIOUS_SESSION_THEME, theme)
@@ -75,16 +75,16 @@ export default defineComponent({
       }
     })
 
-    const welcomeHidden = ref<boolean>(getStorage(STORAGE_WELCOME_HIDDEN))
-    watch(welcomeHidden, (value) => {
-      setStorage(STORAGE_WELCOME_HIDDEN, value)
-    })
+    const { orientation } = useOrientation()
 
     return {
       isConnected,
       isInitializing,
-      welcomeHidden,
+      showDisplayDisconnected,
+      reloadTimes,
       showAppsSelector,
+      orientation,
+      isChrome,
     }
   },
 })
@@ -92,10 +92,11 @@ export default defineComponent({
 
 <template>
   <div
-    class="app w-full h-full flex flex-col relative"
+    class="app w-full h-full relative outline-none"
     :class="{
-      'disconnected pointer-events-none': !isInitializing && !isConnected
+      'disconnected pointer-events-none': !isInitializing && !isConnected,
     }"
+    tabindex="0"
   >
     <AppConnecting
       v-if="isInitializing"
@@ -103,12 +104,19 @@ export default defineComponent({
     />
 
     <AppDisconnected
-      v-else-if="!isConnected"
+      v-else-if="showDisplayDisconnected"
       class="absolute inset-0"
     />
 
-    <template v-else>
-      <AppHeader class="flex-none relative z-10 border-b border-gray-200 dark:border-gray-800" />
+    <div
+      v-else
+      :key="reloadTimes"
+      class="w-full h-full flex"
+      :class="{
+        'flex-col': orientation === 'portrait',
+      }"
+    >
+      <AppHeader class="flex-none relative z-10 border-b border-gray-200 dark:border-gray-700" />
 
       <SplitPane
         save-id="app-select-pane"
@@ -128,16 +136,10 @@ export default defineComponent({
           <router-view class="h-full overflow-auto" />
         </template>
       </SplitPane>
-    </template>
+    </div>
 
-    <portal-target name="root" />
+    <TeleportTarget id="root" />
 
     <ErrorOverlay />
-
-    <WelcomeSlideshow
-      v-if="!welcomeHidden"
-      class="absolute inset-0 z-100"
-      @hide="welcomeHidden = true"
-    />
   </div>
 </template>

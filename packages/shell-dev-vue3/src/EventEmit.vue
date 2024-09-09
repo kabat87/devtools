@@ -1,3 +1,9 @@
+<script setup>
+defineEmits([
+  'foo',
+])
+</script>
+
 <template>
   <div style="display: inline-block;">
     <button @click="$emit('foo', 42, 'a')">

@@ -1,27 +1,22 @@
 <script>
 // Fork of https://github.com/egoist/vue-monaco/
-
 import * as monaco from 'monaco-editor'
 import assign from 'lodash/merge'
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line ts/no-var-requires, ts/no-require-imports
 monaco.editor.defineTheme('github-light', require('@front/assets/github-theme/light.json'))
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line ts/no-var-requires, ts/no-require-imports
 monaco.editor.defineTheme('github-dark', require('@front/assets/github-theme/dark.json'))
 
 export default {
   name: 'MonacoEditor',
-
-  model: {
-    event: 'change',
-  },
 
   props: {
     original: {
       type: String,
       default: null,
     },
-    value: {
+    modelValue: {
       type: String,
       required: true,
     },
@@ -43,10 +38,12 @@ export default {
     },
   },
 
+  emits: ['update:modelValue', 'editorWillMount', 'editorDidMount'],
+
   watch: {
     options: {
       deep: true,
-      handler (options) {
+      handler(options) {
         if (this.editor) {
           const editor = this.getModifiedEditor()
           editor.updateOptions(options)
@@ -54,7 +51,7 @@ export default {
       },
     },
 
-    value (newValue) {
+    modelValue(newValue) {
       if (this.editor) {
         const editor = this.getModifiedEditor()
         if (newValue !== editor.getValue()) {
@@ -63,7 +60,7 @@ export default {
       }
     },
 
-    original (newValue) {
+    original(newValue) {
       if (this.editor && this.diffEditor) {
         const editor = this.getOriginalEditor()
         if (newValue !== editor.getValue()) {
@@ -72,68 +69,70 @@ export default {
       }
     },
 
-    language (newVal) {
+    language(newVal) {
       if (this.editor) {
         const editor = this.getModifiedEditor()
         this.monaco.editor.setModelLanguage(editor.getModel(), newVal)
       }
     },
 
-    theme (newVal) {
+    theme(newVal) {
       if (this.editor) {
         this.monaco.editor.setTheme(newVal)
       }
     },
   },
 
-  mounted () {
+  mounted() {
     this.monaco = monaco
     this.$nextTick(() => {
       this.initMonaco(monaco)
     })
   },
 
-  beforeDestroy () {
+  beforeUnmount() {
     this.editor && this.editor.dispose()
   },
 
   methods: {
-    initMonaco (monaco) {
+    initMonaco(monaco) {
       this.$emit('editorWillMount', this.monaco)
 
       const options = assign(
         {
-          value: this.value,
+          value: this.modelValue,
           theme: this.theme,
           language: this.language,
         },
         this.options,
       )
+      const root = this.$refs.root
 
       if (this.diffEditor) {
-        this.editor = monaco.editor.createDiffEditor(this.$el, options)
+        this.editor = monaco.editor.createDiffEditor(root, options)
         const originalModel = monaco.editor.createModel(
           this.original,
           this.language,
         )
         const modifiedModel = monaco.editor.createModel(
-          this.value,
+          this.modelValue,
           this.language,
         )
         this.editor.setModel({
           original: originalModel,
           modified: modifiedModel,
         })
-      } else {
-        this.editor = monaco.editor.create(this.$el, options)
+      }
+      else {
+        this.editor = monaco.editor.create(root, options)
       }
 
       // @event `change`
       const editor = this.getModifiedEditor()
-      editor.onDidChangeModelContent(event => {
+      editor.onDidChangeModelContent((event) => {
         const value = editor.getValue()
-        if (this.value !== value) {
-          this.$emit('change', value, event)
+        if (this.modelValue !== value) {
+          this.$emit('update:modelValue', value, event)
         }
       })
 
@@ -141,23 +140,23 @@ export default {
     },
 
     /** @deprecated */
-    getMonaco () {
+    getMonaco() {
       return this.editor
     },
 
-    getEditor () {
+    getEditor() {
       return this.editor
     },
 
-    getModifiedEditor () {
+    getModifiedEditor() {
       return this.diffEditor ? this.editor.getModifiedEditor() : this.editor
     },
 
-    getOriginalEditor () {
+    getOriginalEditor() {
       return this.diffEditor ? this.editor.getOriginalEditor() : this.editor
     },
 
-    focus () {
+    focus() {
       this.editor.focus()
     },
   },
@@ -165,5 +164,5 @@ export default {
 </script>
 
 <template>
-  <div />
+  <div ref="root" />
 </template>

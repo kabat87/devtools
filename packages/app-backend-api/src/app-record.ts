@@ -1,5 +1,5 @@
-import { DevtoolsBackend } from './backend'
-import { App, ComponentInstance, TimelineEventOptions, ID, WithId } from '@vue/devtools-api'
+import type { App, ComponentInstance } from '@vue/devtools-api'
+import type { DevtoolsBackend } from './backend'
 
 export interface AppRecordOptions {
   app: App
@@ -20,6 +20,7 @@ export interface AppRecord {
   perfGroupIds: Map<string, { groupId: number, time: number }>
   iframe: string
   meta: any
+  missingInstanceQueue: Set<string>
 }
 
 /**

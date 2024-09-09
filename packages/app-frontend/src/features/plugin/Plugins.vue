@@ -1,9 +1,9 @@
 <script lang="ts">
 import SplitPane from '@front/features/layout/SplitPane.vue'
+import { computed, defineComponent, ref } from 'vue'
 import PluginListItem from './PluginListItem.vue'
 import PluginHome from './PluginHome.vue'
 
-import { defineComponent, ref, computed } from '@vue/composition-api'
 import { usePlugins } from '.'
 
 export default defineComponent({
@@ -13,7 +13,7 @@ export default defineComponent({
     PluginHome,
   },
 
-  setup () {
+  setup() {
     const { plugins } = usePlugins()
 
     const search = ref('')
@@ -47,14 +47,25 @@ export default defineComponent({
     >
       <template #left>
         <div class="h-full flex flex-col">
-          <div class="flex-none">
+          <div class="flex-none flex items-center border-b border-gray-200 dark:border-gray-700">
             <VueInput
               v-model="search"
               icon-left="search"
               placeholder="Filter devtools plugins..."
               select-all
-              class="w-full flat border-b border-gray-200 dark:border-gray-800"
+              class="flex-1 w-0 flat"
             />
+
+            <VueButton
+              :to="{
+                name: 'global-settings',
+              }"
+              icon-left="settings"
+              icon-right="arrow_forward"
+              class="flat"
+            >
+              Settings
+            </VueButton>
           </div>
           <div class="overflow-y-auto">
             <PluginListItem
@@ -72,23 +83,11 @@ export default defineComponent({
         </div>
       </template>
     </SplitPane>
-
-    <portal to="header-end">
-      <VueButton
-        :to="{
-          name: 'global-settings'
-        }"
-        icon-left="settings"
-        class="flat"
-      >
-        Global settings
-      </VueButton>
-    </portal>
   </div>
 </template>
 
 <style scoped>
-.vue-ui-icon /deep/ svg {
+.vue-ui-icon :deep(svg) {
   fill: currentColor;
 }
 </style>

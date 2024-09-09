@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, computed } from '@vue/composition-api'
+import { computed, defineComponent } from 'vue'
 import { useVueVersionCheck } from './vue-version-check'
 
 export default defineComponent({
@@ -8,9 +8,14 @@ export default defineComponent({
       type: Object,
       required: true,
     },
+
+    selected: {
+      type: Boolean,
+      default: false,
+    },
   },
 
-  setup (props) {
+  setup(props) {
     const { getLatestVersion } = useVueVersionCheck()
     const latestVersion = computed(() => getLatestVersion(props.app.version))
     const hasNewVersion = computed(() => latestVersion.value !== props.app.version)
@@ -27,7 +32,12 @@ export default defineComponent({
   <div class="leading-tight">
     <div class="app-button flex items-center">
       <span class="truncate flex-1">{{ app.name }}</span>
-      <span class="flex-none flex items-center">
+      <span
+        class="flex-none flex items-center"
+        :class="{
+          'opacity-40': !selected,
+        }"
+      >
         <img
           src="~@front/assets/vue-logo.svg"
           class="w-6 h-6"

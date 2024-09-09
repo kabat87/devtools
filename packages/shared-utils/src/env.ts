@@ -1,11 +1,13 @@
+import type { App } from 'vue'
+
 export const isBrowser = typeof navigator !== 'undefined'
 export const target: any = isBrowser
   ? window
-  : typeof global !== 'undefined'
-    ? global
+  : typeof globalThis !== 'undefined'
+    ? globalThis
     : {}
 export const isChrome = typeof target.chrome !== 'undefined' && !!target.chrome.devtools
-export const isFirefox = isBrowser && navigator.userAgent.indexOf('Firefox') > -1
+export const isFirefox = isBrowser && navigator.userAgent.includes('Firefox')
 export const isWindows = isBrowser && navigator.platform.indexOf('Win') === 0
 export const isMac = isBrowser && navigator.platform === 'MacIntel'
 export const isLinux = isBrowser && navigator.platform.indexOf('Linux') === 0
@@ -18,10 +20,12 @@ export const keys = {
   esc: 'Esc',
 }
 
-export function initEnv (Vue) {
-  if (Vue.prototype.hasOwnProperty('$isChrome')) return
+export function initEnv(app: App) {
+  if (Object.prototype.hasOwnProperty.call(app.config.globalProperties, '$isChrome')) {
+    return
+  }
 
-  Object.defineProperties(Vue.prototype, {
+  Object.defineProperties(app.config.globalProperties, {
     $isChrome: { get: () => isChrome },
     $isFirefox: { get: () => isFirefox },
     $isWindows: { get: () => isWindows },
@@ -30,7 +34,13 @@ export function initEnv (Vue) {
     $keys: { get: () => keys },
   })
 
-  if (isWindows) document.body.classList.add('platform-windows')
-  if (isMac) document.body.classList.add('platform-mac')
-  if (isLinux) document.body.classList.add('platform-linux')
+  if (isWindows) {
+    document.body.classList.add('platform-windows')
+  }
+  if (isMac) {
+    document.body.classList.add('platform-mac')
+  }
+  if (isLinux) {
+    document.body.classList.add('platform-linux')
+  }
 }

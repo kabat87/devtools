@@ -1,6 +1,7 @@
-import { setStorage, getStorage } from './storage'
-import { Bridge } from './bridge'
-import { isMac } from './env'
+import { reactive } from 'vue'
+import { getStorage, setStorage } from './storage'
+import type { Bridge } from './bridge'
+import { isBrowser, isMac } from './env'
 
 // Initial state
 const internalSharedData = {
@@ -21,15 +22,21 @@ const internalSharedData = {
   vuexAutoload: false,
   vuexGroupGettersByModule: true,
   showMenuScrollTip: true,
+  timelineRecording: false,
   timelineTimeGrid: true,
-  timelineScreenshots: true,
+  timelineScreenshots: false,
   menuStepScrolling: isMac,
   pluginPermissions: {} as any,
   pluginSettings: {} as any,
   pageConfig: {} as any,
   legacyApps: false,
+  trackUpdates: true,
+  flashUpdates: false,
   debugInfo: false,
+  isBrowser,
 }
+
+type TSharedData = typeof internalSharedData
 
 const persisted = [
   'componentNameStyle',
@@ -43,6 +50,7 @@ const persisted = [
   'vuexGroupGettersByModule',
   'timeFormat',
   'showMenuScrollTip',
+  'timelineRecording',
   'timelineTimeGrid',
   'timelineScreenshots',
   'menuStepScrolling',
@@ -50,6 +58,8 @@ const persisted = [
   'pluginSettings',
   'performanceMonitoringEnabled',
   'componentEventsEnabled',
+  'trackUpdates',
+  'flashUpdates',
   'debugInfo',
 ]
 
@@ -69,12 +79,11 @@ let initRetryCount = 0
 export interface SharedDataParams {
   bridge: Bridge
   persist: boolean
-  Vue?: any
 }
 
 const initCbs = []
 
-export function initSharedData (params: SharedDataParams): Promise<void> {
+export function initSharedData(params: SharedDataParams): Promise<void> {
   return new Promise((resolve) => {
     // Mandatory params
     bridge = params.bridge
@@ -86,7 +95,7 @@ export function initSharedData (params: SharedDataParams): Promise<void> {
         console.log('[shared data] Master init in progress...')
       }
       // Load persisted fields
-      persisted.forEach(key => {
+      persisted.forEach((key) => {
         const value = getStorage(`vue-devtools-${storageVersion}:shared-data:${key}`)
         if (value !== null) {
           internalSharedData[key] = value
@@ -94,7 +103,7 @@ export function initSharedData (params: SharedDataParams): Promise<void> {
       })
       bridge.on('shared-data:load', () => {
         // Send all fields
-        Object.keys(internalSharedData).forEach(key => {
+        Object.keys(internalSharedData).forEach((key) => {
           sendValue(key, internalSharedData[key])
         })
         bridge.send('shared-data:load-complete')
@@ -128,7 +137,8 @@ export function initSharedData (params: SharedDataParams): Promise<void> {
           console.error('[shared data] Master init failed')
         }
       }, 2000)
-    } else {
+    }
+    else {
       if (process.env.NODE_ENV !== 'production') {
         // eslint-disable-next-line no-console
         console.log('[shared data] Minion init in progress...')
@@ -152,13 +162,7 @@ export function initSharedData (params: SharedDataParams): Promise<void> {
       bridge.send('shared-data:minion-init-waiting')
     }
 
-    data = {
-      ...internalSharedData,
-    }
-
-    if (params.Vue) {
-      data = params.Vue.observable(data)
-    }
+    data = reactive({ ...internalSharedData })
 
     // Update value from other shared data clients
     bridge.on('shared-data:set', ({ key, value }) => {
@@ -169,22 +173,24 @@ export function initSharedData (params: SharedDataParams): Promise<void> {
   })
 }
 
-export function onSharedDataInit (cb) {
+export function onSharedDataInit(cb) {
   initCbs.push(cb)
   return () => {
     const index = initCbs.indexOf(cb)
-    if (index !== -1) initCbs.splice(index, 1)
+    if (index !== -1) {
+      initCbs.splice(index, 1)
+    }
   }
 }
 
-export function destroySharedData () {
+let watchers: Partial<Record<keyof TSharedData, ((value: any, oldValue: any) => unknown)[]>> = {}
+
+export function destroySharedData() {
   bridge.removeAllListeners('shared-data:set')
   watchers = {}
 }
 
-let watchers = {}
-
-function setValue (key: string, value: any) {
+function setValue(key: string, value: any) {
   // Storage
   if (persist && persisted.includes(key)) {
     setStorage(`vue-devtools-${storageVersion}:shared-data:${key}`, value)
@@ -199,24 +205,28 @@ function setValue (key: string, value: any) {
   return true
 }
 
-function sendValue (key: string, value: any) {
+function sendValue(key: string, value: any) {
   bridge && bridge.send('shared-data:set', {
     key,
     value,
   })
 }
 
-export function watchSharedData (prop, handler) {
+export function watchSharedData<
+  TKey extends keyof TSharedData,
+>(prop: TKey, handler: (value: TSharedData[TKey], oldValue: TSharedData[TKey]) => unknown) {
   const list = watchers[prop] || (watchers[prop] = [])
   list.push(handler)
   return () => {
     const index = list.indexOf(handler)
-    if (index !== -1) list.splice(index, 1)
+    if (index !== -1) {
+      list.splice(index, 1)
+    }
   }
 }
 
 const proxy: Partial<typeof internalSharedData> = {}
-Object.keys(internalSharedData).forEach(key => {
+Object.keys(internalSharedData).forEach((key) => {
   Object.defineProperty(proxy, key, {
     configurable: false,
     get: () => data[key],

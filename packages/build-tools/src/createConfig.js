@@ -2,9 +2,6 @@ const webpack = require('webpack')
 const { mergeWithRules } = require('webpack-merge')
 const FriendlyErrorsPlugin = require('friendly-errors-webpack-plugin')
 const { VueLoaderPlugin } = require('vue-loader')
-const path = require('path')
-const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin')
-const ESLintPlugin = require('eslint-webpack-plugin')
 const MonacoEditorPlugin = require('monaco-editor-webpack-plugin')
 
 exports.createConfig = (config, target = { chrome: 52, firefox: 48 }) => {
@@ -18,6 +15,7 @@ exports.createConfig = (config, target = { chrome: 52, firefox: 48 }) => {
       alias: {
         '@front': '@vue-devtools/app-frontend/src',
         '@back': '@vue-devtools/app-backend-core/lib',
+        'vue': require.resolve('vue/dist/vue.esm-bundler.js'),
       },
       // symlinks: false,
       fallback: {
@@ -46,6 +44,7 @@ exports.createConfig = (config, target = { chrome: 52, firefox: 48 }) => {
             compilerOptions: {
               preserveWhitespace: false,
             },
+            isServerBuild: false,
             transpileOptions: {
               target,
               objectAssign: 'Object.assign',
@@ -81,8 +80,14 @@ exports.createConfig = (config, target = { chrome: 52, firefox: 48 }) => {
           ],
         },
         {
-          test: /\.(png|woff2|svg|ttf)$/,
+          test: /\.svg$/,
+          loader: 'svg-inline-loader',
+          exclude: /assets/,
+        },
+        {
+          test: /\.(png|woff2|ttf|svg)$/,
           type: 'asset/inline',
+          exclude: /@akryum\/md-icons-svg\/svg/,
         },
       ],
     },
@@ -94,19 +99,8 @@ exports.createConfig = (config, target = { chrome: 52, firefox: 48 }) => {
       ...(process.env.VUE_DEVTOOL_TEST ? [] : [new FriendlyErrorsPlugin()]),
       new webpack.DefinePlugin({
         'process.env.RELEASE_CHANNEL': JSON.stringify(process.env.RELEASE_CHANNEL || 'stable'),
-        __VUE_OPTIONS_API__: true,
-        __VUE_PROD_DEVTOOLS__: true,
-      }),
-      new ForkTsCheckerWebpackPlugin({
-        typescript: {
-          configFile: path.resolve(__dirname, '../../../tsconfig.json'),
-          extensions: {
-            vue: true,
-          },
-        },
-      }),
-      new ESLintPlugin({
-        threads: true,
+        '__VUE_OPTIONS_API__': true,
+        '__VUE_PROD_DEVTOOLS__': true,
       }),
       new MonacoEditorPlugin({
         // https://github.com/Microsoft/monaco-editor-webpack-plugin#options

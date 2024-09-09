@@ -1,8 +1,8 @@
+import type { App as VueApp } from 'vue'
+import { createApp as createVueApp } from 'vue'
+import { BridgeEvents, SharedData, destroySharedData, initEnv, initSharedData, isChrome } from '@vue-devtools/shared-utils'
 import App from './features/App.vue'
-
-import Vue from 'vue'
-import { isChrome, initEnv, SharedData, initSharedData, destroySharedData } from '@vue-devtools/shared-utils'
-import { createRouter } from './router'
+import { createRouterInstance } from './router'
 import { getBridge, setBridge } from './features/bridge'
 import { setAppConnected, setAppInitializing } from './features/connection'
 import { setupAppsBridgeEvents } from './features/apps'
@@ -12,37 +12,25 @@ import { setupCustomInspectorBridgeEvents } from './features/inspector/custom/co
 import { setupPluginsBridgeEvents } from './features/plugin'
 import { setupPlugins } from './plugins'
 
-setupPlugins()
-
 // Capture and log devtool errors when running as actual extension
 // so that we can debug it by inspecting the background page.
 // We do want the errors to be thrown in the dev shell though.
-if (isChrome) {
-  Vue.config.errorHandler = (e, vm) => {
-    getBridge()?.send('ERROR', {
-      message: e.message,
-      stack: e.stack,
-      component: vm.$options.name || (vm.$options as any)._componentTag || 'anonymous',
-    })
+export function createApp() {
+  const router = createRouterInstance()
+
+  const app = createVueApp(App)
+  app.use(router)
+  setupPlugins(app)
+
+  if (isChrome) {
+    app.config.errorHandler = (e, vm) => {
+      getBridge()?.send('ERROR', {
+        message: (e as Error).message,
+        stack: (e as Error).stack,
+        component: vm?.$options.name || (vm?.$options as any)._componentTag || 'anonymous',
+      })
+    }
   }
-}
-
-// @ts-ignore
-Vue.options.renderError = (h, e) => {
-  return h('pre', {
-    class: 'text-white bg-red-500 p-2 rounded text-xs overflow-auto',
-  }, e.stack)
-}
-
-export function createApp () {
-  const router = createRouter()
-
-  const app = new Vue({
-    router,
-    render: h => h(App as any),
-  })
-
-  // @TODO [Vue 3] Setup plugins
 
   return app
 }
@@ -51,27 +39,31 @@ export function createApp () {
  * Connect then init the app. We need to reconnect on every reload, because a
  * new backend will be injected.
  */
-export function connectApp (app, shell) {
-  shell.connect(async bridge => {
+export function connectApp(app: VueApp, shell) {
+  shell.connect(async (bridge) => {
     setBridge(bridge)
     // @TODO remove
-    // @ts-ignore
+    // @ts-expect-error custom prop on window
     window.bridge = bridge
 
-    if (Object.prototype.hasOwnProperty.call(Vue.prototype, '$shared')) {
+    if (app.config.globalProperties.$shared) {
       destroySharedData()
-    } else {
-      Object.defineProperty(Vue.prototype, '$shared', {
+    }
+    else {
+      Object.defineProperty(app.config.globalProperties, '$shared', {
         get: () => SharedData,
       })
     }
 
-    initEnv(Vue)
+    initEnv(app)
+
+    bridge.on(BridgeEvents.TO_FRONT_TITLE, ({ title }: { title: string }) => {
+      document.title = `${title} - Vue devtools`
+    })
 
     await initSharedData({
       bridge,
       persist: true,
-      Vue,
     })
 
     if (SharedData.logDetected) {

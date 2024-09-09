@@ -1,22 +1,26 @@
 <script lang="ts">
-import { defineComponent } from '@vue/composition-api'
+/* eslint-disable vue/no-unused-refs */
+
+import { defineComponent, toRaw } from 'vue'
 import {
   BridgeEvents,
-  isPlainObject,
-  sortByKey,
-  openInEditor,
   copyToClipboard,
+  isPlainObject,
+  openInEditor,
+  sortByKey,
 } from '@vue-devtools/shared-utils'
 import DataFieldEdit from '@front/mixins/data-field-edit'
-import { formattedValue, valueType, valueDetails } from '@front/util/format'
+import { formattedValue, valueDetails, valueType } from '@front/util/format'
 import { getBridge } from '../bridge'
 
-function subFieldCount (value) {
+function subFieldCount(value) {
   if (Array.isArray(value)) {
     return value.length
-  } else if (value && typeof value === 'object') {
+  }
+  else if (value && typeof value === 'object') {
     return Object.keys(value).length
-  } else {
+  }
+  else {
     return 0
   }
 }
@@ -51,7 +55,9 @@ export default defineComponent({
     },
   },
 
-  data () {
+  emits: ['editState'],
+
+  data() {
     return {
       contextMenuOpen: false,
       limit: 20,
@@ -60,56 +66,63 @@ export default defineComponent({
   },
 
   computed: {
-    depthMargin (): number {
+    depthMargin(): number {
       return (this.depth + 1) * 14 + 10
     },
 
-    valueType (): string {
+    valueType(): string {
       return valueType(this.field.value)
     },
 
-    valueDetails (): string {
+    interpretedValueType(): string {
+      return valueType(this.field.value, false)
+    },
+
+    valueDetails(): string {
       return valueDetails(this.field.value)
     },
 
-    rawValueType (): string {
+    nativeValueType(): string {
       return typeof this.field.value
     },
 
-    isExpandableType (): boolean {
+    isExpandableType(): boolean {
       let value = this.field.value
       if (this.valueType === 'custom') {
         value = value._custom.value
       }
       const closed = this.fieldOptions.closed
       const closedDefined = typeof closed !== 'undefined'
-      return (!closedDefined &&
-        (
-          Array.isArray(value) ||
-          isPlainObject(value)
-        )) ||
-        (
-          closedDefined &&
-          !closed
+      return (!closedDefined
+        && (
+          Array.isArray(value)
+          || isPlainObject(value)
+        ))
+        || (
+          closedDefined
+          && !closed
         )
     },
 
-    formattedValue (): string {
+    formattedValue(): string {
       const value = this.field.value
-      if (this.field.objectType === 'Reactive') {
+      const objectType = value?._custom?.objectType || this.field.objectType
+      if (objectType === 'Reactive') {
         return 'Reactive'
-      } else if (this.fieldOptions.abstract) {
+      }
+      else if (this.fieldOptions.abstract) {
         return ''
-      } else {
+      }
+      else {
         let result = `<span class="value-formatted-ouput">${formattedValue(value)}</span>`
-        if (this.field.objectType) {
-          result += ` <span class="text-gray-500">(${this.field.objectType})</span>`
+        if (objectType) {
+          result += ` <span class="text-gray-500">(${objectType})</span>`
         }
         return result
       }
     },
 
-    rawValue (): any {
+    rawValue(): any {
       let value = this.field.value
 
       // CustomValue API
@@ -126,7 +139,7 @@ export default defineComponent({
       return { value, inherit }
     },
 
-    formattedSubFields (): any[] {
+    formattedSubFields(): any[] {
       let { value, inherit } = this.rawValue
 
       if (Array.isArray(value)) {
@@ -135,7 +148,8 @@ export default defineComponent({
           value: item,
           ...inherit,
         }))
-      } else if (typeof value === 'object') {
+      }
+      else if (typeof value === 'object') {
         value = Object.keys(value).map(key => ({
           key,
           value: value[key],
@@ -149,47 +163,53 @@ export default defineComponent({
       return value.slice(0, this.limit)
     },
 
-    subFieldCount (): number {
+    subFieldCount(): number {
       const { value } = this.rawValue
       return subFieldCount(value)
     },
 
-    valueTooltip (): string {
+    valueTooltip(): string {
       const type = this.valueType
       if (this.field.raw) {
         return `<span class="font-mono">${this.field.raw}</span>`
-      } else if (type === 'custom') {
+      }
+      else if (type === 'custom') {
         return this.field.value._custom.tooltip
-      } else if (type.indexOf('native ') === 0) {
+      }
+      else if (type.indexOf('native ') === 0) {
         return type.substring('native '.length)
-      } else {
+      }
+      else {
         return null
       }
     },
 
-    fieldOptions (): any {
+    fieldOptions(): any {
       if (this.valueType === 'custom') {
         return Object.assign({}, this.field, this.field.value._custom)
-      } else {
+      }
+      else {
         return this.field
       }
     },
 
-    editErrorMessage (): string {
+    editErrorMessage(): string {
       if (!this.valueValid) {
         return 'Invalid value (must be valid JSON)'
-      } else if (!this.keyValid) {
+      }
+      else if (!this.keyValid) {
         if (this.duplicateKey) {
           return 'Duplicate key'
-        } else {
+        }
+        else {
           return 'Invalid key'
         }
       }
       return ''
     },
 
-    valueClass (): string[] {
-      const cssClass = [this.valueType, `raw-${this.rawValueType}`]
+    valueClass(): string[] {
+      const cssClass = [this.valueType, `raw-${this.nativeValueType}`]
       if (this.valueType === 'custom') {
         const value = this.field.value
         value._custom.type && cssClass.push(`type-${value._custom.type}`)
@@ -198,7 +218,7 @@ export default defineComponent({
       return cssClass
     },
 
-    displayedKey (): string {
+    displayedKey(): string {
       let key = this.field.key
       if (typeof key === 'string') {
         key = key.replace('__vue__', '')
@@ -206,17 +226,18 @@ export default defineComponent({
       return key
     },
 
-    customActions (): { icon: string, tooltip?: string }[] {
+    customActions(): { icon: string, tooltip?: string }[] {
       return this.field.value?._custom?.actions ?? []
     },
   },
 
   watch: {
     forceCollapse: {
-      handler (value) {
+      handler(value) {
         if (value === 'expand' && this.depth < 4) {
           this.expanded = true
-        } else if (value === 'collapse') {
+        }
+        else if (value === 'collapse') {
           this.expanded = false
         }
       },
@@ -224,21 +245,21 @@ export default defineComponent({
     },
   },
 
-  created () {
+  created() {
     const value = this.field.value && this.field.value._custom ? this.field.value._custom.value : this.field.value
     this.expanded = this.depth === 0 && this.field.key !== '$route' && (subFieldCount(value) < 12)
   },
 
   methods: {
-    copyValue () {
+    copyValue() {
       copyToClipboard(this.field.value)
     },
 
-    copyPath () {
+    copyPath() {
       copyToClipboard(this.path)
     },
 
-    onClick (event) {
+    onClick(event) {
       // Cancel if target is interactive
       if (event.target.tagName === 'INPUT' || event.target.className.includes('button')) {
         return
@@ -252,7 +273,9 @@ export default defineComponent({
         if (this.$isChrome) {
           const evl = `inspect(window.__VUE_DEVTOOLS_INSTANCE_MAP__.get("${this.fieldOptions.uid}").$refs["${this.fieldOptions.key}"])`
           chrome.devtools.inspectedWindow.eval(evl)
-        } else {
+        }
+        else {
+          // eslint-disable-next-line no-alert
           window.alert('DOM inspection is not supported in this shell.')
         }
       }
@@ -261,45 +284,42 @@ export default defineComponent({
       this.toggle()
     },
 
-    toggle () {
+    toggle() {
       if (this.isExpandableType) {
         this.expanded = !this.expanded
 
-        // @ts-ignore
         !this.expanded && this.cancelCurrentEdition()
       }
     },
 
     hyphen: v => v.replace(/\s/g, '-'),
 
-    onContextMenuMouseEnter () {
-      // @ts-ignore
+    onContextMenuMouseEnter() {
       clearTimeout(this.$_contextMenuTimer)
     },
 
-    onContextMenuMouseLeave () {
-      // @ts-ignore
+    onContextMenuMouseLeave() {
       clearTimeout(this.$_contextMenuTimer)
       this.$_contextMenuTimer = setTimeout(() => {
         this.contextMenuOpen = false
       }, 4000)
     },
 
-    showMoreSubfields () {
+    showMoreSubfields() {
       this.limit += 20
     },
 
-    logToConsole (level = 'log') {
+    logToConsole(level = 'log') {
       getBridge().send(BridgeEvents.TO_BACK_LOG, {
         level,
-        value: this.field.value,
+        value: toRaw(this.field.value),
         revive: true,
       })
     },
 
-    executeCustomAction (index: number) {
+    executeCustomAction(index: number) {
       getBridge().send(BridgeEvents.TO_BACK_CUSTOM_STATE_ACTION, {
-        value: this.field.value,
+        value: toRaw(this.field.value),
         actionIndex: index,
       })
     },
@@ -312,17 +332,18 @@ export default defineComponent({
 <template>
   <div class="data-field">
     <VTooltip
-      :style="{ marginLeft: depth * 14 + 'px' }"
+      :style="{ marginLeft: `${depth * 14}px` }"
       :disabled="!field.meta"
       :class="{
         'force-toolbar z-10': contextMenuOpen || editing,
       }"
       class="self"
       placement="left"
-      :offset="[0, 24]"
-      @click.native="onClick"
-      @mouseenter.native="onContextMenuMouseEnter"
-      @mouseleave.native="onContextMenuMouseLeave"
+      :distance="0"
+      :skidding="24"
+      @click="onClick"
+      @mouseenter="onContextMenuMouseEnter"
+      @mouseleave="onContextMenuMouseLeave"
     >
       <span
         v-show="isExpandableType"
@@ -345,7 +366,7 @@ export default defineComponent({
         v-else
         v-tooltip="fieldOptions.abstract && {
           content: valueTooltip,
-          html: true
+          html: true,
         }"
         :class="{ abstract: fieldOptions.abstract }"
         class="key text-purple-700 dark:text-purple-300"
@@ -364,6 +385,7 @@ export default defineComponent({
           class="edit-input value-input text-black"
           :class="{ error: !valueValid }"
           list="special-tokens"
+          :type="inputType"
           @keydown.esc.capture.stop.prevent="cancelEdit()"
           @keydown.enter="submitEdit()"
         >
@@ -378,7 +400,7 @@ export default defineComponent({
             <VueButton
               v-tooltip="{
                 content: $t('DataField.edit.cancel.tooltip'),
-                html: true
+                html: true,
               }"
               class="icon-button flat"
               icon-left="cancel"
@@ -387,7 +409,7 @@ export default defineComponent({
             <VueButton
               v-tooltip="{
                 content: $t('DataField.edit.submit.tooltip'),
-                html: true
+                html: true,
               }"
               class="icon-button flat"
               icon-left="save"
@@ -401,7 +423,7 @@ export default defineComponent({
         <span
           v-tooltip="{
             content: valueTooltip,
-            html: true
+            html: true,
           }"
           :class="valueClass"
           class="value"
@@ -487,14 +509,14 @@ export default defineComponent({
 
           <!-- Context menu -->
           <VueDropdown
-            :open.sync="contextMenuOpen"
+            v-model="contextMenuOpen"
           >
-            <VueButton
-              slot="trigger"
-              icon-left="more_vert"
-              class="icon-button flat"
-            />
-
+            <template #trigger>
+              <VueButton
+                icon-left="more_vert"
+                class="icon-button flat"
+              />
+            </template>
             <div
               class="context-menu-dropdown"
               @mouseenter="onContextMenuMouseEnter"
@@ -549,12 +571,12 @@ export default defineComponent({
         :renamable="editable && valueType === 'plain-object'"
         :force-collapse="forceCollapse"
         :is-state-field="isStateField"
-        @edit-state="(path, payload) => $emit('edit-state', path, payload)"
+        @edit-state="(path, payload) => $emit('editState', path, payload)"
       />
       <VueButton
         v-if="subFieldCount > limit"
         v-tooltip="'Show more'"
-        :style="{ marginLeft: depthMargin + 'px' }"
+        :style="{ marginLeft: `${depthMargin}px` }"
         icon-left="more_horiz"
         class="icon-button flat more"
         @click="showMoreSubfields()"
@@ -572,7 +594,7 @@ export default defineComponent({
         :is-state-field="isStateField"
         @cancel-edit="addingValue = false"
         @submit-edit="addingValue = false"
-        @edit-state="(path, payload) => $emit('edit-state', path, payload)"
+        @edit-state="(path, payload) => $emit('editState', path, payload)"
       />
     </div>
   </div>
@@ -621,11 +643,11 @@ export default defineComponent({
       user-select none
       width 20px
       height @width
-    .icon-button >>> .vue-ui-icon,
+    .icon-button :deep(.vue-ui-icon),
     .small-icon
       width 16px
       height @width
-    .warning >>> svg
+    .warning :deep(svg)
       fill $orange
   &:hover,
   &.force-toolbar
@@ -673,7 +695,7 @@ export default defineComponent({
   &.string, &.native
     color $red
   &.string
-    >>> span
+    :deep(span)
       color $black
       .vue-ui-dark-mode &
         color $red
@@ -681,7 +703,7 @@ export default defineComponent({
     color #999
   &.literal
     color $vividBlue
-  &.raw-boolean >>> .value-formatted-ouput
+  &.raw-boolean :deep(.value-formatted-ouput)
     width 36px
     display inline-block
   &.native.Error
@@ -704,7 +726,7 @@ export default defineComponent({
         content '>'
     &.type-function
       font-style italic
-      >>> span
+      :deep(span)
         color $vividBlue
         font-family dejavu sans mono, monospace
         .platform-mac &
@@ -715,11 +737,11 @@ export default defineComponent({
           color $purple
     &.type-component-definition
       color $green
-      >>> span
+      :deep(span)
         color $darkerGrey
     &.type-reference
         opacity 0.5
-      >>> .attr-title
+      :deep(.attr-title)
         color #800080
         .vue-ui-dark-mode &
           color #e36eec
@@ -776,7 +798,7 @@ export default defineComponent({
 .more
   width 20px
   height @width
-  >>> .vue-ui-icon
+  :deep(.vue-ui-icon)
     width 16px
     height @width
 </style>

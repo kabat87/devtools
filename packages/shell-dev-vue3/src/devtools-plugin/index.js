@@ -1,4 +1,5 @@
 import { setupDevtoolsPlugin } from '@vue/devtools-api'
+import { reactive, ref } from 'vue'
 
 /** @type {import('@vue/devtools-api').DevtoolsPluginApi} */
 let devtoolsApi
@@ -68,7 +69,8 @@ export default {
             textColor: 0x000000,
             backgroundColor: 0xFF984F,
           })
-        } else {
+        }
+        else {
           node.tags.push({
             label: 'test',
             textColor: 0xFFAAAA,
@@ -103,7 +105,14 @@ export default {
             },
           })
 
-          return api.getComponentBounds(payload.componentInstance).then(bounds => {
+          payload.instanceData.state.push({
+            type: 'fail',
+            key: 'state',
+            editable: true,
+            value: reactive({ n: ref(0) }),
+          })
+
+          return api.getComponentBounds(payload.componentInstance).then((bounds) => {
             payload.instanceData.state.push({
               type: stateType,
               key: 'bounds',
@@ -117,7 +126,7 @@ export default {
                 : null,
             })
           }).then(() => api.getComponentName(payload.componentInstance))
-            .then(name => {
+            .then((name) => {
               payload.instanceData.state.push({
                 type: stateType,
                 key: 'component name',
@@ -127,7 +136,7 @@ export default {
         }
       })
 
-      api.on.editComponentState(payload => {
+      api.on.editComponentState((payload) => {
         if (payload.type === stateType) {
           payload.set(componentState)
         }
@@ -151,7 +160,7 @@ export default {
       api.addTimelineEvent({
         layerId: 'test-layer',
         event: {
-          time: Date.now(),
+          time: api.now(),
           title: 'Early event',
           data: {},
         },
@@ -165,9 +174,9 @@ export default {
         })
       }
 
-      api.on.inspectTimelineEvent(payload => {
+      api.on.inspectTimelineEvent((payload) => {
         if (payload.layerId === 'test-layer') {
-          return new Promise(resolve => {
+          return new Promise((resolve) => {
             payload.data = {
               ...payload.data,
               hey: 'hello',
@@ -197,6 +206,16 @@ export default {
             },
           },
         ],
+        nodeActions: [
+          {
+            icon: 'help',
+            tooltip: 'Test custom node action',
+            action: (arg1) => {
+              console.log('Node action', arg1)
+              api.selectInspectorNode('test-inspector', 'child')
+            },
+          },
+        ],
       })
 
       api.addInspector({
@@ -206,7 +225,7 @@ export default {
 
       let componentInstances = []
 
-      api.on.getInspectorTree(payload => {
+      api.on.getInspectorTree((payload) => {
         if (payload.inspectorId === 'test-inspector') {
           payload.rootNodes = [
             {
@@ -224,7 +243,7 @@ export default {
                     },
                     {
                       label: 'test',
-                      textColor: 0xffffff,
+                      textColor: 0xFFFFFF,
                       backgroundColor: 0x000000,
                     },
                   ],
@@ -232,7 +251,8 @@ export default {
               ],
             },
           ]
-        } else if (payload.inspectorId === 'test-inspector2') {
+        }
+        else if (payload.inspectorId === 'test-inspector2') {
           return api.getComponentInstances(app).then((instances) => {
             componentInstances = instances
             for (const instance of instances) {
@@ -249,7 +269,7 @@ export default {
         foo: 'bar',
       }
 
-      api.on.getInspectorState(payload => {
+      api.on.getInspectorState((payload) => {
         if (payload.inspectorId === 'test-inspector') {
           if (payload.nodeId === 'root') {
             payload.state = {
@@ -265,7 +285,8 @@ export default {
                 },
               ],
             }
-          } else {
+          }
+          else {
             payload.state = {
               'child info': [
                 {
@@ -281,7 +302,8 @@ export default {
               ],
             }
           }
-        } else if (payload.inspectorId === 'test-inspector2') {
+        }
+        else if (payload.inspectorId === 'test-inspector2') {
           const instance = componentInstances.find(instance => instance.uid.toString() === payload.nodeId)
           if (instance) {
             api.unhighlightElement()
@@ -290,7 +312,7 @@ export default {
         }
       })
 
-      api.on.editInspectorState(payload => {
+      api.on.editInspectorState((payload) => {
         if (payload.inspectorId === 'test-inspector') {
           if (payload.nodeId === 'root') {
             payload.set(myState)
@@ -299,18 +321,18 @@ export default {
       })
 
       // Plugin settings change
-      api.on.setPluginSettings(payload => {
+      api.on.setPluginSettings((payload) => {
         console.log('plugin settings changed', payload)
       })
     })
 
     // Outside of setupDevtoolsPlugin
 
-    window.addEventListener('mouseup', event => {
+    window.addEventListener('mouseup', (event) => {
       devtoolsApi && devtoolsApi.addTimelineEvent({
         layerId: 'test-layer',
         event: {
-          time: Date.now(),
+          time: devtoolsApi.now(),
           data: {
             info: 'window.mouseup',
             x: event.clientX,
@@ -321,11 +343,11 @@ export default {
       })
     })
 
-    window.addEventListener('keydown', event => {
+    window.addEventListener('keydown', (event) => {
       devtoolsApi && devtoolsApi.addTimelineEvent({
         layerId: 'test-layer',
         event: {
-          time: Date.now(),
+          time: devtoolsApi.now(),
           data: {
             info: 'window.keyup',
             key: event.key,

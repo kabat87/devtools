@@ -18,6 +18,10 @@ export enum BridgeEvents {
   /** Tab was switched */
   TO_BACK_TAB_SWITCH = 'b:tab:switch',
   TO_BACK_LOG = 'b:log',
+  /** Reconnected after background script is terminated (idle) */
+  TO_FRONT_RECONNECTED = 'f:reconnected',
+  /** Change app title (electron) */
+  TO_FRONT_TITLE = 'f:title',
 
   // Apps
   /** App was registered */
@@ -51,6 +55,7 @@ export enum BridgeEvents {
   TO_FRONT_COMPONENT_INSPECT_DOM = 'f:component:inspect-dom',
   TO_BACK_COMPONENT_RENDER_CODE = 'b:component:render-code',
   TO_FRONT_COMPONENT_RENDER_CODE = 'f:component:render-code',
+  TO_FRONT_COMPONENT_UPDATED = 'f:component:updated',
 
   // Timeline
   TO_FRONT_TIMELINE_EVENT = 'f:timeline:event',
@@ -83,10 +88,11 @@ export enum BridgeEvents {
   TO_FRONT_CUSTOM_INSPECTOR_STATE = 'f:custom-inspector:state',
   TO_BACK_CUSTOM_INSPECTOR_EDIT_STATE = 'b:custom-inspector:edit-state',
   TO_BACK_CUSTOM_INSPECTOR_ACTION = 'b:custom-inspector:action',
+  TO_BACK_CUSTOM_INSPECTOR_NODE_ACTION = 'b:custom-inspector:node-action',
   TO_FRONT_CUSTOM_INSPECTOR_SELECT_NODE = 'f:custom-inspector:select-node',
 
   // Custom state
-  TO_BACK_CUSTOM_STATE_ACTION = 'b:custom-state:action'
+  TO_BACK_CUSTOM_STATE_ACTION = 'b:custom-state:action',
 }
 
 export enum BridgeSubscriptions {
@@ -119,4 +125,12 @@ export enum HookEvents {
    * @deprecated
    */
   FLUSH = 'flush',
+  /**
+   * @deprecated
+   */
+  TRACK_UPDATE = '_track-update',
+  /**
+   * @deprecated
+   */
+  FLASH_UPDATE = '_flash-update',
 }

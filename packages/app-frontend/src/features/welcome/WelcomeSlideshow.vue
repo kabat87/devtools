@@ -1,12 +1,12 @@
 <script lang="ts">
-import { defineComponent, ref, watch } from '@vue/composition-api'
+import { defineComponent, ref, watch } from 'vue'
 
 export default defineComponent({
   emits: [
     'hide',
   ],
 
-  setup () {
+  setup() {
     const step = ref(0)
     const content = ref<HTMLDivElement>()
 
@@ -25,7 +25,7 @@ export default defineComponent({
 
 <template>
   <div class="bg-white/50 dark:bg-black/50 p-4 flex items-center justify-center">
-    <div class="bg-white dark:bg-black rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 h-full w-[620px] max-w-full flex flex-col">
+    <div class="bg-white dark:bg-black rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 h-full w-[620px] max-w-full flex flex-col">
       <div
         ref="content"
         class="flex-1 overflow-auto p-4"
@@ -34,7 +34,7 @@ export default defineComponent({
           <img
             src="~@front/assets/devtools-logo.svg"
             alt="Devtools logo"
-            class="logo max-h-[160px]"
+            class="logo max-h-[100px]"
           >
           <h1 class="text-green-500 text-2xl text-center mt-8">
             Welcome to the Vue devtools!
@@ -42,7 +42,7 @@ export default defineComponent({
         </template>
 
         <template v-if="step === 1">
-          <h2>Let's have little tour</h2>
+          <h2>Let's take a little tour</h2>
 
           <p>
             The devtools were entirely rewritten with the release of Vue 3.
@@ -187,7 +187,7 @@ export default defineComponent({
               href="https://devtools.vuejs.org/guide/installation.html#legacy"
               target="_blank"
             >Legacy version</a> and <a
-              href="https://new-issue.vuejs.org/?repo=vuejs/devtools"
+              href="https://github.com/vuejs/devtools/issues/new/choose"
               target="_blank"
             >report an issue</a>.
           </p>
@@ -199,7 +199,7 @@ export default defineComponent({
           <div
             class="h-[2px] bg-green-500 transition-all duration-500 ease-out"
             :style="{
-              width: `${step / stepMax * 100}%`
+              width: `${step / stepMax * 100}%`,
             }"
           />
         </div>
@@ -249,7 +249,7 @@ img {
   }
 
   &:not(.logo) {
-    @apply border border-gray-200 dark:border-gray-800 rounded-md;
+    @apply border border-gray-200 dark:border-gray-700 rounded-md;
   }
 }
 

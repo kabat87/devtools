@@ -1,19 +1,21 @@
+// eslint-disable-next-line unicorn/prefer-node-protocol
 import path from 'path'
-import { CustomState } from '@vue/devtools-api'
-import { stringifyCircularAutoChunks, parseCircularAutoChunks } from './transfer'
+import type { CustomState } from '@vue/devtools-api'
+import { parseCircularAutoChunks, stringifyCircularAutoChunks } from './transfer'
 import {
-  getInstanceMap,
   getCustomInstanceDetails,
+  getCustomObjectDetails,
   getCustomRouterDetails,
   getCustomStoreDetails,
+  getInstanceMap,
   isVueInstance,
 } from './backend'
 import { SharedData } from './shared-data'
 import { isChrome, target } from './env'
 
-function cached (fn) {
+function cached(fn) {
   const cache = Object.create(null)
-  return function cachedFn (str) {
+  return function cachedFn(str) {
     const hit = cache[str]
     return hit || (cache[str] = fn(str))
   }
@@ -25,7 +27,7 @@ export const classify = cached((str) => {
   // This bug may causes the UI 'Component Filter' to not work properly
   // e.g. The type of 'str' is Number.
   // So need cover 'str' to String.
-  return str && ('' + str).replace(classifyRE, toUpper)
+  return str && (`${str}`).replace(classifyRE, toUpper)
 })
 
 const camelizeRE = /-(\w)/g
@@ -42,11 +44,11 @@ export const kebabize = cached((str) => {
     .toLowerCase()
 })
 
-function toUpper (_, c) {
+function toUpper(_, c) {
   return c ? c.toUpperCase() : ''
 }
 
-export function getComponentDisplayName (originalName, style = 'class') {
+export function getComponentDisplayName(originalName, style = 'class') {
   switch (style) {
     case 'class':
       return classify(originalName)
@@ -58,13 +60,15 @@ export function getComponentDisplayName (originalName, style = 'class') {
   }
 }
 
-export function inDoc (node) {
-  if (!node) return false
+export function inDoc(node) {
+  if (!node) {
+    return false
+  }
   const doc = node.ownerDocument.documentElement
   const parent = node.parentNode
-  return doc === node ||
-    doc === parent ||
-    !!(parent && parent.nodeType === 1 && (doc.contains(parent)))
+  return doc === node
+    || doc === parent
+    || !!(parent && parent.nodeType === 1 && (doc.contains(parent)))
 }
 
 /**
@@ -77,28 +81,32 @@ export const NEGATIVE_INFINITY = '__vue_devtool_negative_infinity__'
 export const NAN = '__vue_devtool_nan__'
 
 export const SPECIAL_TOKENS = {
-  true: true,
-  false: false,
-  undefined: UNDEFINED,
-  null: null,
+  'true': true,
+  'false': false,
+  'undefined': UNDEFINED,
+  'null': null,
   '-Infinity': NEGATIVE_INFINITY,
-  Infinity: INFINITY,
-  NaN: NAN,
+  'Infinity': INFINITY,
+  'NaN': NAN,
 }
 
 export const MAX_STRING_SIZE = 10000
 export const MAX_ARRAY_SIZE = 5000
 
-export function specialTokenToString (value) {
+export function specialTokenToString(value) {
   if (value === null) {
     return 'null'
-  } else if (value === UNDEFINED) {
+  }
+  else if (value === UNDEFINED) {
     return 'undefined'
-  } else if (value === NAN) {
+  }
+  else if (value === NAN) {
     return 'NaN'
-  } else if (value === INFINITY) {
+  }
+  else if (value === INFINITY) {
     return 'Infinity'
-  } else if (value === NEGATIVE_INFINITY) {
+  }
+  else if (value === NEGATIVE_INFINITY) {
     return '-Infinity'
   }
   return false
@@ -114,7 +122,7 @@ export function specialTokenToString (value) {
 class EncodeCache {
   map: Map<any, any>
 
-  constructor () {
+  constructor() {
     this.map = new Map()
   }
 
@@ -123,18 +131,19 @@ class EncodeCache {
    * @param {*} data Input data
    * @param {*} factory Function used to create the unique result
    */
-  cache<TResult, TData> (data: TData, factory: (data: TData) => TResult): TResult {
+  cache<TResult, TData>(data: TData, factory: (data: TData) => TResult): TResult {
     const cached: TResult = this.map.get(data)
     if (cached) {
       return cached
-    } else {
+    }
+    else {
       const result = factory(data)
       this.map.set(data, result)
       return result
     }
   }
 
-  clear () {
+  clear() {
     this.map.clear()
   }
 }
@@ -147,14 +156,14 @@ class ReviveCache {
   size: number
   maxSize: number
 
-  constructor (maxSize: number) {
+  constructor(maxSize: number) {
     this.maxSize = maxSize
     this.map = new Map()
     this.index = 0
     this.size = 0
   }
 
-  cache (value: any) {
+  cache(value: any) {
     const currentIndex = this.index
     this.map.set(currentIndex, value)
     this.size++
@@ -166,21 +175,26 @@ class ReviveCache {
     return currentIndex
   }
 
-  read (id: number) {
+  read(id: number) {
     return this.map.get(id)
   }
 }
 
 const reviveCache = new ReviveCache(1000)
 
-export function stringify (data) {
-  // Create a fresh cache for each serialization
-  encodeCache.clear()
-  return stringifyCircularAutoChunks(data, replacer)
+const replacers = {
+  internal: replacerForInternal,
+  user: replaceForUser,
 }
 
-function replacer (key) {
-  // @ts-ignore
+export function stringify(data, target: keyof typeof replacers = 'internal') {
+  // Create a fresh cache for each serialization
+  encodeCache.clear()
+  return stringifyCircularAutoChunks(data, replacers[target])
+}
+
+function replacerForInternal(key) {
+  // @ts-expect-error meow
   const val = this[key]
   const type = typeof val
   if (Array.isArray(val)) {
@@ -193,55 +207,113 @@ function replacer (key) {
       }
     }
     return val
-  } else if (typeof val === 'string') {
+  }
+  else if (typeof val === 'string') {
     if (val.length > MAX_STRING_SIZE) {
-      return val.substring(0, MAX_STRING_SIZE) + `... (${(val.length)} total length)`
-    } else {
+      return `${val.substring(0, MAX_STRING_SIZE)}... (${(val.length)} total length)`
+    }
+    else {
       return val
     }
-  } else if (type === 'undefined') {
+  }
+  else if (type === 'undefined') {
     return UNDEFINED
-  } else if (val === Infinity) {
+  }
+  else if (val === Number.POSITIVE_INFINITY) {
     return INFINITY
-  } else if (val === -Infinity) {
+  }
+  else if (val === Number.NEGATIVE_INFINITY) {
     return NEGATIVE_INFINITY
-  } else if (type === 'function') {
+  }
+  else if (type === 'function') {
     return getCustomFunctionDetails(val)
-  } else if (type === 'symbol') {
+  }
+  else if (type === 'symbol') {
     return `[native Symbol ${Symbol.prototype.toString.call(val)}]`
-  } else if (val !== null && type === 'object') {
+  }
+  else if (type === 'bigint') {
+    return getCustomBigIntDetails(val)
+  }
+  else if (val !== null && type === 'object') {
     const proto = Object.prototype.toString.call(val)
     if (proto === '[object Map]') {
       return encodeCache.cache(val, () => getCustomMapDetails(val))
-    } else if (proto === '[object Set]') {
+    }
+    else if (proto === '[object Set]') {
       return encodeCache.cache(val, () => getCustomSetDetails(val))
-    } else if (proto === '[object RegExp]') {
+    }
+    else if (proto === '[object RegExp]') {
       // special handling of native type
       return `[native RegExp ${RegExp.prototype.toString.call(val)}]`
-    } else if (proto === '[object Date]') {
-      return `[native Date ${Date.prototype.toString.call(val)}]`
-    } else if (proto === '[object Error]') {
+    }
+    else if (proto === '[object Date]') {
+      return getCustomDateDetails(val)
+    }
+    else if (proto === '[object Error]') {
       return `[native Error ${val.message}<>${val.stack}]`
-    } else if (val.state && val._vm) {
+    }
+    else if (val.state && val._vm) {
       return encodeCache.cache(val, () => getCustomStoreDetails(val))
-    } else if (val.constructor && val.constructor.name === 'VueRouter') {
+    }
+    else if (val.constructor && val.constructor.name === 'VueRouter') {
       return encodeCache.cache(val, () => getCustomRouterDetails(val))
-    } else if (isVueInstance(val)) {
+    }
+    else if (isVueInstance(val)) {
       return encodeCache.cache(val, () => getCustomInstanceDetails(val))
-    } else if (typeof val.render === 'function') {
+    }
+    else if (typeof val.render === 'function') {
       return encodeCache.cache(val, () => getCustomComponentDefinitionDetails(val))
-    } else if (val.constructor && val.constructor.name === 'VNode') {
+    }
+    else if (val.constructor && val.constructor.name === 'VNode') {
       return `[native VNode <${val.tag}>]`
-    } else if (val instanceof HTMLElement) {
+    }
+    else if (typeof HTMLElement !== 'undefined' && val instanceof HTMLElement) {
       return encodeCache.cache(val, () => getCustomHTMLElementDetails(val))
     }
-  } else if (Number.isNaN(val)) {
+    else if (val.constructor?.name === 'Store' && val._wrappedGetters) {
+      return `[object Store]`
+    }
+    else if (val.currentRoute) {
+      return `[object Router]`
+    }
+    const customDetails = getCustomObjectDetails(val, proto)
+    if (customDetails != null) {
+      return customDetails
+    }
+  }
+  else if (Number.isNaN(val)) {
     return NAN
   }
   return sanitize(val)
 }
 
-export function getCustomMapDetails (val) {
+// @TODO revive from backend to have more data to the clipboard
+function replaceForUser(key) {
+  // @ts-expect-error meow
+  let val = this[key]
+  const type = typeof val
+  if (val?._custom && 'value' in val._custom) {
+    val = val._custom.value
+  }
+  if (type !== 'object') {
+    if (val === UNDEFINED) {
+      return undefined
+    }
+    else if (val === INFINITY) {
+      return Number.POSITIVE_INFINITY
+    }
+    else if (val === NEGATIVE_INFINITY) {
+      return Number.NEGATIVE_INFINITY
+    }
+    else if (val === NAN) {
+      return Number.NaN
+    }
+    return val
+  }
+  return sanitize(val)
+}
+
+export function getCustomMapDetails(val) {
   const list = []
   val.forEach(
     (value, key) => list.push({
@@ -262,7 +334,7 @@ export function getCustomMapDetails (val) {
   }
 }
 
-export function reviveMap (val) {
+export function reviveMap(val) {
   const result = new Map()
   const list = val._custom.value
   for (let i = 0; i < list.length; i++) {
@@ -272,7 +344,7 @@ export function reviveMap (val) {
   return result
 }
 
-export function getCustomSetDetails (val) {
+export function getCustomSetDetails(val) {
   const list = Array.from(val)
   return {
     _custom: {
@@ -284,7 +356,7 @@ export function getCustomSetDetails (val) {
   }
 }
 
-export function reviveSet (val) {
+export function reviveSet(val) {
   const result = new Set()
   const list = val._custom.value
   for (let i = 0; i < list.length; i++) {
@@ -294,16 +366,46 @@ export function reviveSet (val) {
   return result
 }
 
+export function getCustomBigIntDetails(val) {
+  const stringifiedBigInt = BigInt.prototype.toString.call(val)
+  return {
+    _custom: {
+      type: 'bigint',
+      display: `BigInt(${stringifiedBigInt})`,
+      value: stringifiedBigInt,
+    },
+  }
+}
+
+export function getCustomDateDetails(val: Date) {
+  const dateCopy = new Date(val.getTime())
+  dateCopy.setMinutes(dateCopy.getMinutes() - dateCopy.getTimezoneOffset())
+
+  const displayedTime = Date.prototype.toString.call(val)
+  return {
+    _custom: {
+      type: 'date',
+      display: displayedTime,
+      value: dateCopy.toISOString().slice(0, -1),
+      skipSerialize: true,
+    },
+  }
+}
+
 // Use a custom basename functions instead of the shimed version
 // because it doesn't work on Windows
-function basename (filename, ext) {
+export function basename(filename, ext) {
+  filename = filename.replace(/\\/g, '/')
+  if (filename.includes(`/index${ext}`)) {
+    filename = filename.replace(`/index${ext}`, ext)
+  }
   return path.basename(
-    filename.replace(/^[a-zA-Z]:/, '').replace(/\\/g, '/'),
+    filename.replace(/^[a-z]:/i, ''),
     ext,
   )
 }
 
-export function getComponentName (options) {
+export function getComponentName(options) {
   const name = options.displayName || options.name || options._componentTag
   if (name) {
     return name
@@ -314,13 +416,14 @@ export function getComponentName (options) {
   }
 }
 
-export function getCustomComponentDefinitionDetails (def) {
+export function getCustomComponentDefinitionDetails(def) {
   let display = getComponentName(def)
   if (display) {
     if (def.name && def.__file) {
       display += ` <span>(${def.__file})</span>`
     }
-  } else {
+  }
+  else {
     display = '<i>Unknown Component</i>'
   }
   return {
@@ -337,32 +440,33 @@ export function getCustomComponentDefinitionDetails (def) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-export function getCustomFunctionDetails (func: Function): CustomState {
+export function getCustomFunctionDetails(func: Function): CustomState {
   let string = ''
   let matches = null
   try {
     string = Function.prototype.toString.call(func)
     matches = String.prototype.match.call(string, /\([\s\S]*?\)/)
-  } catch (e) {
+  }
+  catch (e) {
     // Func is probably a Proxy, which can break Function.prototype.toString()
   }
   // Trim any excess whitespace from the argument string
   const match = matches && matches[0]
   const args = typeof match === 'string'
-    ? `(${match.substring(1, match.length - 2).split(',').map(a => a.trim()).join(', ')})`
+    ? match
     : '(?)'
   const name = typeof func.name === 'string' ? func.name : ''
   return {
     _custom: {
       type: 'function',
-      display: `<span>f</span> ${escape(name)}${args}`,
+      display: `<span style="opacity:.5;">function</span> ${escape(name)}${args}`,
+      tooltip: string.trim() ? `<pre>${string}</pre>` : null,
       _reviveId: reviveCache.cache(func),
     },
   }
 }
 
-export function getCustomHTMLElementDetails (value: HTMLElement): CustomState {
+export function getCustomHTMLElementDetails(value: HTMLElement): CustomState {
   try {
     return {
       _custom: {
@@ -381,7 +485,8 @@ export function getCustomHTMLElementDetails (value: HTMLElement): CustomState {
         ],
       },
     }
-  } catch (e) {
+  }
+  catch (e) {
     return {
       _custom: {
         type: 'HTMLElement',
@@ -391,7 +496,7 @@ export function getCustomHTMLElementDetails (value: HTMLElement): CustomState {
   }
 }
 
-function namedNodeMapToObject (map: NamedNodeMap) {
+function namedNodeMapToObject(map: NamedNodeMap) {
   const result: any = {}
   const l = map.length
   for (let i = 0; i < l; i++) {
@@ -401,23 +506,25 @@ function namedNodeMapToObject (map: NamedNodeMap) {
   return result
 }
 
-export function getCustomRefDetails (instance, key, ref) {
+export function getCustomRefDetails(instance, key, ref) {
   let value
   if (Array.isArray(ref)) {
-    value = ref.map((r) => getCustomRefDetails(instance, key, r)).map(data => data.value)
-  } else {
+    value = ref.map(r => getCustomRefDetails(instance, key, r)).map(data => data.value)
+  }
+  else {
     let name
     if (ref._isVue) {
       name = getComponentName(ref.$options)
-    } else {
+    }
+    else {
       name = ref.tagName.toLowerCase()
     }
 
     value = {
       _custom: {
-        display: `&lt;${name}` +
-          (ref.id ? ` <span class="attr-title">id</span>="${ref.id}"` : '') +
-          (ref.className ? ` <span class="attr-title">class</span>="${ref.className}"` : '') + '&gt;',
+        display: `&lt;${name}${
+          ref.id ? ` <span class="attr-title">id</span>="${ref.id}"` : ''
+          }${ref.className ? ` <span class="attr-title">class</span>="${ref.className}"` : ''}&gt;`,
         uid: instance.__VUE_DEVTOOLS_UID__,
         type: 'reference',
       },
@@ -425,58 +532,75 @@ export function getCustomRefDetails (instance, key, ref) {
   }
   return {
     type: '$refs',
-    key: key,
+    key,
     value,
     editable: false,
   }
 }
 
-export function parse (data: any, revive = false) {
+export function parse(data: any, revive = false) {
   return revive
     ? parseCircularAutoChunks(data, reviver)
     : parseCircularAutoChunks(data)
 }
 
-const specialTypeRE = /^\[native (\w+) (.*?)(<>((.|\s)*))?\]$/
+const specialTypeRE = /^\[native (\w+) (.*?)(?:<>[.\s]*)?\]$/
 const symbolRE = /^\[native Symbol Symbol\((.*)\)\]$/
 
-function reviver (key, val) {
+function reviver(key, val) {
   return revive(val)
 }
 
-export function revive (val) {
+export function revive(val) {
   if (val === UNDEFINED) {
     return undefined
-  } else if (val === INFINITY) {
-    return Infinity
-  } else if (val === NEGATIVE_INFINITY) {
-    return -Infinity
-  } else if (val === NAN) {
-    return NaN
-  } else if (val && val._custom) {
+  }
+  else if (val === INFINITY) {
+    return Number.POSITIVE_INFINITY
+  }
+  else if (val === NEGATIVE_INFINITY) {
+    return Number.NEGATIVE_INFINITY
+  }
+  else if (val === NAN) {
+    return Number.NaN
+  }
+  else if (val && val._custom) {
     const { _custom: custom }: CustomState = val
     if (custom.type === 'component') {
       return getInstanceMap().get(custom.id)
-    } else if (custom.type === 'map') {
+    }
+    else if (custom.type === 'map') {
       return reviveMap(val)
-    } else if (custom.type === 'set') {
+    }
+    else if (custom.type === 'set') {
       return reviveSet(val)
-    } else if (custom._reviveId) {
+    }
+    else if (custom.type === 'bigint') {
+      return BigInt(custom.value)
+    }
+    else if (custom.type === 'date') {
+      return new Date(custom.value)
+    }
+    else if (custom._reviveId) {
       return reviveCache.read(custom._reviveId)
-    } else {
+    }
+    else {
       return revive(custom.value)
     }
-  } else if (symbolRE.test(val)) {
+  }
+  else if (symbolRE.test(val)) {
     const [, string] = symbolRE.exec(val)
     return Symbol.for(string)
-  } else if (specialTypeRE.test(val)) {
+  }
+  else if (specialTypeRE.test(val)) {
     const [, type, string,, details] = specialTypeRE.exec(val)
-    const result = new window[type](string)
+    const result = new target[type](string)
     if (type === 'Error' && details) {
       result.stack = details
     }
     return result
-  } else {
+  }
+  else {
     return val
   }
 }
@@ -490,33 +614,34 @@ export function revive (val) {
  * @return {*}
  */
 
-function sanitize (data) {
+function sanitize(data) {
   if (
-    !isPrimitive(data) &&
-    !Array.isArray(data) &&
-    !isPlainObject(data)
+    !isPrimitive(data)
+    && !Array.isArray(data)
+    && !isPlainObject(data)
   ) {
     // handle types that will probably cause issues in
     // the structured clone
     return Object.prototype.toString.call(data)
-  } else {
+  }
+  else {
     return data
   }
 }
 
-export function isPlainObject (obj) {
+export function isPlainObject(obj) {
   return Object.prototype.toString.call(obj) === '[object Object]'
 }
 
-function isPrimitive (data) {
+function isPrimitive(data) {
   if (data == null) {
     return true
   }
   const type = typeof data
   return (
-    type === 'string' ||
-    type === 'number' ||
-    type === 'boolean'
+    type === 'string'
+      || type === 'number'
+      || type === 'boolean'
   )
 }
 
@@ -526,7 +651,7 @@ function isPrimitive (data) {
  * @param {string} searchTerm Search string
  * @returns {boolean} Search match
  */
-export function searchDeepInObject (obj, searchTerm) {
+export function searchDeepInObject(obj, searchTerm) {
   const seen = new Map()
   const result = internalSearchObject(obj, searchTerm.toLowerCase(), seen, 0)
   seen.clear()
@@ -543,7 +668,7 @@ const SEARCH_MAX_DEPTH = 10
  * @param {number} depth Deep search depth level, which is capped to prevent performance issues
  * @returns {boolean} Search match
  */
-function internalSearchObject (obj, searchTerm, seen, depth) {
+function internalSearchObject(obj, searchTerm, seen, depth) {
   if (depth > SEARCH_MAX_DEPTH) {
     return false
   }
@@ -569,7 +694,7 @@ function internalSearchObject (obj, searchTerm, seen, depth) {
  * @param {number} depth Deep search depth level, which is capped to prevent performance issues
  * @returns {boolean} Search match
  */
-function internalSearchArray (array, searchTerm, seen, depth) {
+function internalSearchArray(array, searchTerm, seen, depth) {
   if (depth > SEARCH_MAX_DEPTH) {
     return false
   }
@@ -594,7 +719,7 @@ function internalSearchArray (array, searchTerm, seen, depth) {
  * @param {number} depth Deep search depth level, which is capped to prevent performance issues
  * @returns {boolean} Search match
  */
-function internalSearchCheck (searchTerm, key, value, seen, depth) {
+function internalSearchCheck(searchTerm, key, value, seen, depth) {
   let match = false
   let result
   if (key === '_custom') {
@@ -605,17 +730,21 @@ function internalSearchCheck (searchTerm, key, value, seen, depth) {
   if (key && compare(key, searchTerm)) {
     match = true
     seen.set(value, true)
-  } else if (seen.has(value)) {
+  }
+  else if (seen.has(value)) {
     match = seen.get(value)
-  } else if (Array.isArray(value)) {
+  }
+  else if (Array.isArray(value)) {
     seen.set(value, null)
     match = internalSearchArray(value, searchTerm, seen, depth)
     seen.set(value, match)
-  } else if (isPlainObject(value)) {
+  }
+  else if (isPlainObject(value)) {
     seen.set(value, null)
     match = internalSearchObject(value, searchTerm, seen, depth)
     seen.set(value, match)
-  } else if (compare(value, searchTerm)) {
+  }
+  else if (compare(value, searchTerm)) {
     match = true
     seen.set(value, true)
   }
@@ -628,19 +757,23 @@ function internalSearchCheck (searchTerm, key, value, seen, depth) {
  * @param {string} searchTerm Search string
  * @returns {boolean} Search match
  */
-function compare (value, searchTerm) {
-  return ('' + value).toLowerCase().indexOf(searchTerm) !== -1
+function compare(value, searchTerm) {
+  return (`${value}`).toLowerCase().includes(searchTerm)
 }
 
-export function sortByKey (state) {
+export function sortByKey(state) {
   return state && state.slice().sort((a, b) => {
-    if (a.key < b.key) return -1
-    if (a.key > b.key) return 1
+    if (a.key < b.key) {
+      return -1
+    }
+    if (a.key > b.key) {
+      return 1
+    }
     return 0
   })
 }
 
-export function simpleGet (object, path) {
+export function simpleGet(object, path) {
   const sections = Array.isArray(path) ? path : path.split('.')
   for (let i = 0; i < sections.length; i++) {
     object = object[sections[i]]
@@ -651,12 +784,12 @@ export function simpleGet (object, path) {
   return object
 }
 
-export function focusInput (el) {
+export function focusInput(el) {
   el.focus()
   el.setSelectionRange(0, el.value.length)
 }
 
-export function openInEditor (file) {
+export function openInEditor(file) {
   // Console display
   const fileName = file.replace(/\\/g, '\\\\')
   const src = `fetch('${SharedData.openInEditorHost}__open-in-editor?file=${encodeURI(file)}').then(response => {
@@ -675,7 +808,8 @@ export function openInEditor (file) {
   })`
   if (isChrome) {
     target.chrome.devtools.inspectedWindow.eval(src)
-  } else {
+  }
+  else {
     // eslint-disable-next-line no-eval
     eval(src)
   }
@@ -688,24 +822,56 @@ const ESC = {
   '&': '&amp;',
 }
 
-export function escape (s) {
+export function escape(s) {
   return s.replace(/[<>"&]/g, escapeChar)
 }
 
-function escapeChar (a) {
+function escapeChar(a) {
   return ESC[a] || a
 }
 
-export function copyToClipboard (state) {
-  if (typeof document === 'undefined') return
+export function copyToClipboard(state) {
+  let text: string
+
+  if (typeof state !== 'object') {
+    text = String(state)
+  }
+  else {
+    text = stringify(state, 'user')
+  }
+
+  // @TODO navigator.clipboard is buggy in extensions
+  if (typeof document === 'undefined') {
+    return
+  }
   const dummyTextArea = document.createElement('textarea')
-  dummyTextArea.textContent = stringify(state)
+  dummyTextArea.textContent = text
   document.body.appendChild(dummyTextArea)
   dummyTextArea.select()
   document.execCommand('copy')
   document.body.removeChild(dummyTextArea)
 }
 
-export function isEmptyObject (obj) {
+export function isEmptyObject(obj) {
   return obj === UNDEFINED || !obj || Object.keys(obj).length === 0
+}
+
+/**
+ * chunk an array into smaller chunk of given size.
+ * @see https://stackoverflow.com/a/37826698
+ * @param array
+ * @param size
+ */
+export function chunk(array: unknown[], size: number): unknown[][] {
+  return array.reduce((resultArray, item, index) => {
+    const chunkIndex = Math.floor(index / size)
+
+    if (!resultArray[chunkIndex]) {
+      resultArray[chunkIndex] = [] // start a new chunk
+    }
+
+    resultArray[chunkIndex].push(item)
+
+    return resultArray
+  }, []) as unknown[][]
 }

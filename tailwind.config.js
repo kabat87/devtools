@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
-
-const path = require('path')
+const path = require('node:path')
 
 module.exports = {
   theme: {
@@ -29,6 +27,19 @@ module.exports = {
           700: '#8128e8',
           800: '#6523c4',
           900: '#521fa0',
+        },
+        gray: {
+          50: '#fafafa',
+          100: '#f5f5f5',
+          200: '#e5e5e5',
+          300: '#d4d4d4',
+          400: '#a3a3a3',
+          500: '#737373',
+          600: '#525252',
+          700: '#404040',
+          800: '#262626',
+          900: '#171717',
+          950: '#0a0a0a',
         },
         bluegray: {
           50: '#f3f9fb',

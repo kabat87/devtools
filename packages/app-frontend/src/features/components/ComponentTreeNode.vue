@@ -1,10 +1,12 @@
 <script lang="ts">
-import { computed, toRefs, onMounted, ref, watch, defineComponent, PropType } from '@vue/composition-api'
-import { ComponentTreeNode } from '@vue/devtools-api'
+import type { PropType } from 'vue'
+import { computed, defineComponent, onMounted, ref, toRefs, watch } from 'vue'
+import type { ComponentTreeNode } from '@vue/devtools-api'
 import scrollIntoView from 'scroll-into-view-if-needed'
-import { getComponentDisplayName, UNDEFINED, SharedData } from '@vue-devtools/shared-utils'
-import { sortChildren, useComponent, useComponentHighlight } from './composable'
+import { SharedData, UNDEFINED, getComponentDisplayName } from '@vue-devtools/shared-utils'
 import { onKeyDown } from '@front/util/keyboard'
+import { reactiveNow, useTimeAgo } from '@front/util/time'
+import { sortChildren, updateTrackingEvents, updateTrackingLimit, useComponent, useComponentHighlight } from './composable'
 
 const DEFAULT_EXPAND_DEPTH = 2
 
@@ -23,7 +25,9 @@ export default defineComponent({
     },
   },
 
-  setup (props, { emit }) {
+  emits: ['selectNextSibling', 'selectPreviousSibling'],
+
+  setup(props, { emit }) {
     const { instance } = toRefs(props)
 
     const displayName = computed(() => getComponentDisplayName(props.instance.name, SharedData.componentNameStyle))
@@ -60,7 +64,7 @@ export default defineComponent({
 
     // Auto scroll
 
-    function autoScroll () {
+    function autoScroll() {
       if (selected.value && toggleEl.value) {
         /** @type {HTMLElement} */
         const el = toggleEl.value
@@ -78,7 +82,7 @@ export default defineComponent({
 
     // Keyboard
 
-    onKeyDown(event => {
+    onKeyDown((event) => {
       if (selected.value) {
         requestAnimationFrame(() => {
           switch (event.key) {
@@ -94,51 +98,77 @@ export default defineComponent({
               }
               break
             }
+            case ' ':
+            case 'Enter': {
+              toggle()
+              break
+            }
             case 'ArrowDown': {
               if (expanded.value && sortedChildren.value.length) {
                 // Select first child
                 select(sortedChildren.value[0].id)
-              } else {
-                emit('select-next-sibling')
+              }
+              else {
+                emit('selectNextSibling')
               }
               break
             }
             case 'ArrowUp': {
-              emit('select-previous-sibling')
+              emit('selectPreviousSibling')
             }
           }
         })
       }
     })
 
-    function selectNextSibling (index) {
+    function selectNextSibling(index) {
       if (index + 1 >= sortedChildren.value.length) {
-        emit('select-next-sibling')
-      } else {
+        emit('selectNextSibling')
+      }
+      else {
         select(sortedChildren.value[index + 1].id)
       }
     }
 
-    function selectPreviousSibling (index) {
+    function selectPreviousSibling(index) {
       if (index === 0 || !sortedChildren.value.length) {
         if (selected.value) {
-          emit('select-previous-sibling')
-        } else {
+          emit('selectPreviousSibling')
+        }
+        else {
           select()
         }
-      } else {
+      }
+      else {
         let child = sortedChildren.value[index - 1]
         while (child) {
           if (child.children.length && isComponentOpen(child.id)) {
             const children = sortChildren(child.children)
             child = children[children.length - 1]
-          } else {
+          }
+          else {
             select(child.id)
             child = null
           }
         }
       }
     }
+
+    function switchToggle(event: MouseEvent) {
+      if (event.shiftKey) {
+        toggle(true, !expanded.value)
+      }
+      else {
+        toggle()
+      }
+    }
+    // Update tracking
+
+    const updateTracking = computed(() => updateTrackingEvents.value[props.instance.id])
+    const showUpdateTracking = computed(() => updateTracking.value?.time > updateTrackingLimit.value && updateTracking.value?.time > reactiveNow.value - 20_000)
+    const updateTrackingTime = computed(() => updateTracking.value?.time)
+    const { timeAgo: updateTrackingTimeAgo } = useTimeAgo(updateTrackingTime)
+    const updateTrackingOpacity = computed(() => showUpdateTracking.value ? 1 - (reactiveNow.value - updateTracking.value?.time) / 20_000 : 0)
 
     return {
       toggleEl,
@@ -148,11 +178,15 @@ export default defineComponent({
       selected,
       select,
       expanded,
-      toggle,
+      switchToggle,
       highlight,
       unhighlight,
       selectNextSibling,
       selectPreviousSibling,
+      showUpdateTracking,
+      updateTracking,
+      updateTrackingTimeAgo,
+      updateTrackingOpacity,
     }
   },
 })
@@ -162,15 +196,16 @@ export default defineComponent({
   <div class="min-w-max">
     <div
       ref="toggleEl"
-      class="font-mono cursor-pointer relative z-10 rounded whitespace-nowrap flex items-center pr-2 text-sm selectable-item"
+      class="font-mono cursor-pointer relative z-10 rounded whitespace-nowrap flex items-center pr-2 text-sm select-none selectable-item"
       :class="{
         selected,
         'opacity-50': instance.inactive,
       }"
       :style="{
-        paddingLeft: depth * 15 + 4 + 'px'
+        paddingLeft: `${depth * 15 + 4}px`,
       }"
       @click="select()"
+      @dblclick="switchToggle"
       @mouseover="highlight()"
       @mouseleave="unhighlight()"
     >
@@ -178,13 +213,13 @@ export default defineComponent({
       <span
         class="w-4 h-4 flex items-center justify-center"
         :class="{
-          'invisible': !instance.hasChildren
+          invisible: !instance.hasChildren,
         }"
-        @click.stop="toggle()"
+        @click.stop="switchToggle"
       >
         <span
           :class="{
-            'transform rotate-90': expanded
+            'transform rotate-90': expanded,
           }"
           class="arrow right"
         />
@@ -192,7 +227,12 @@ export default defineComponent({
 
       <!-- Component tag -->
       <span class="content">
-        <span class="angle-bracket text-gray-400 dark:text-gray-600">&lt;</span>
+        <span
+          class="angle-bracket"
+          :class="[
+            selected ? 'text-white/60' : 'text-gray-400 dark:text-gray-600',
+          ]"
+        >&lt;</span>
 
         <span class="item-name text-green-500">{{ displayName }}</span>
 
@@ -200,18 +240,23 @@ export default defineComponent({
           v-if="componentHasKey"
           class="opacity-50 text-xs"
           :class="{
-            'opacity-100': selected
+            'opacity-100': selected,
           }"
         >
           <span
             :class="{
               'text-purple-500': !selected,
-              'text-purple-200': selected
+              'text-purple-200': selected,
             }"
           > key</span>=<span>{{ instance.renderKey }}</span>
         </span>
 
-        <span class="angle-bracket text-gray-400 dark:text-gray-600">&gt;</span>
+        <span
+          class="angle-bracket"
+          :class="[
+            selected ? 'text-white/60' : 'text-gray-400 dark:text-gray-600',
+          ]"
+        >&gt;</span>
       </span>
 
       <span class="flex items-center space-x-2 ml-2 h-full">
@@ -234,7 +279,7 @@ export default defineComponent({
           :key="index"
           v-tooltip="{
             content: tag.tooltip,
-            html: true
+            html: true,
           }"
           :style="{
             color: `#${tag.textColor.toString(16).padStart(6, '0')}`,
@@ -258,6 +303,29 @@ export default defineComponent({
             {{ instance.domOrder }}
           </span>
         </template>
+
+        <VTooltip
+          v-if="showUpdateTracking"
+          class="h-4"
+        >
+          <div class="px-3 -mx-2 h-full flex items-center">
+            <div
+              class="w-1 h-1 rounded-full"
+              :class="[
+                selected ? 'bg-white' : 'bg-green-500',
+              ]"
+              :style="{
+                opacity: updateTrackingOpacity,
+              }"
+            />
+          </div>
+
+          <template #popper>
+            <div>
+              Updated {{ updateTrackingTimeAgo }}
+            </div>
+          </template>
+        </VTooltip>
       </span>
     </div>
 

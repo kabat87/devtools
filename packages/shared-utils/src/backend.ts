@@ -2,22 +2,27 @@ export const backendInjections = {
   instanceMap: new Map(),
   isVueInstance: (() => false) as ((value: any) => boolean),
   getCustomInstanceDetails: (() => ({})) as ((instance: any) => any),
+  getCustomObjectDetails: (() => undefined) as (value: any, proto: string) => any,
 }
 
-export function getInstanceMap () {
+export function getInstanceMap() {
   return backendInjections.instanceMap
 }
 
-export function getCustomInstanceDetails (instance) {
+export function getCustomInstanceDetails(instance) {
   return backendInjections.getCustomInstanceDetails(instance)
 }
 
-export function isVueInstance (value) {
+export function getCustomObjectDetails(value, proto: string) {
+  return backendInjections.getCustomObjectDetails(value, proto)
+}
+
+export function isVueInstance(value) {
   return backendInjections.isVueInstance(value)
 }
 
 // @TODO refactor
-export function getCustomRouterDetails (router) {
+export function getCustomRouterDetails(router) {
   return {
     _custom: {
       type: 'router',
@@ -34,7 +39,7 @@ export function getCustomRouterDetails (router) {
 }
 
 // @TODO refactor
-export function getCustomStoreDetails (store) {
+export function getCustomStoreDetails(store) {
   return {
     _custom: {
       type: 'store',
@@ -51,7 +56,7 @@ export function getCustomStoreDetails (store) {
 }
 
 // @TODO refactor
-export function getCatchedGetters (store) {
+export function getCatchedGetters(store) {
   const getters = {}
 
   const origGetters = store.getters || {}
@@ -63,7 +68,8 @@ export function getCatchedGetters (store) {
       get: () => {
         try {
           return origGetters[key]
-        } catch (e) {
+        }
+        catch (e) {
           return e
         }
       },

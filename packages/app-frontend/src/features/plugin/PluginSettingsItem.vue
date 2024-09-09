@@ -1,7 +1,8 @@
 <script lang="ts">
-import { defineComponent, PropType, computed } from '@vue/composition-api'
-import { PluginSettingsItem } from '@vue/devtools-api'
-import { Plugin } from '.'
+import type { PropType } from 'vue'
+import { computed, defineComponent } from 'vue'
+import type { PluginSettingsItem } from '@vue/devtools-api'
+import type { Plugin } from '.'
 
 export default defineComponent({
   props: {
@@ -20,20 +21,22 @@ export default defineComponent({
       required: true,
     },
 
-    value: {},
+    value: {
+      required: true,
+    },
   },
-
-  setup (props, { emit }) {
+  emits: ['update:value'],
+  setup(props, { emit }) {
     const model = computed({
-      get () {
+      get() {
         return props.value
       },
-      set (value) {
+      set(value) {
         emit('update:value', value)
       },
     })
 
-    function onLabelClick () {
+    function onLabelClick() {
       if (props.schema.type === 'boolean') {
         model.value = !model.value
       }

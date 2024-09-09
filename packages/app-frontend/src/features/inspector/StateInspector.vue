@@ -1,29 +1,31 @@
 <script>
+import { useDefer } from '@front/util/defer'
+import { getStorage, setStorage } from '@vue-devtools/shared-utils'
 import StateType from './StateType.vue'
 
-import Vue from 'vue'
-import { useDefer } from '@front/util/defer'
-
 const keyOrder = {
-  props: 1,
+  'props': 1,
   'register module': 1,
   'unregister module': 1,
-  mutation: 1,
-  setup: 2,
-  data: 2,
-  state: 2,
-  undefined: 3,
-  getters: 3,
-  computed: 4,
-  injected: 5,
-  provided: 5,
+  'mutation': 1,
+  'setup': 2,
+  'data': 2,
+  'state': 2,
+  'undefined': 3,
+  'getters': 3,
+  'computed': 4,
+  'injected': 5,
+  'provided': 5,
   'vuex bindings': 5,
-  $refs: 6,
-  refs: 6,
-  $attrs: 7,
-  attrs: 7,
+  '$refs': 6,
+  'refs': 6,
+  '$attrs': 7,
+  'attrs': 7,
+  'event listeners': 7,
   'setup (other)': 8,
 }
+
+const STORAGE_COLLAPSE_ALL = 'state-inspector.collapse-all'
 
 export default {
   components: {
@@ -42,7 +44,9 @@ export default {
     },
   },
 
-  setup () {
+  emits: ['editState'],
+
+  setup() {
     const { defer } = useDefer()
 
     return {
@@ -50,7 +54,7 @@ export default {
     }
   },
 
-  data () {
+  data() {
     return {
       expandedState: {},
       forceCollapse: null,
@@ -58,52 +62,53 @@ export default {
   },
 
   computed: {
-    dataTypes () {
+    dataTypes() {
       return Object.keys(this.state).sort((a, b) => {
         return (
-          (keyOrder[a] || (a.toLowerCase().charCodeAt(0) + 999)) -
-          (keyOrder[b] || (b.toLowerCase().charCodeAt(0) + 999))
+          (keyOrder[a] || (a.toLowerCase().charCodeAt(0) + 999))
+          - (keyOrder[b] || (b.toLowerCase().charCodeAt(0) + 999))
         )
       })
     },
 
-    totalCount () {
+    totalCount() {
       return Object.keys(this.state).reduce((total, state) => total + state.length, 0)
     },
 
-    highDensity () {
+    highDensity() {
       const pref = this.$shared.displayDensity
       return (pref === 'auto' && this.totalCount > 12) || pref === 'high'
     },
   },
 
   watch: {
-    state () {
-      this.forceCollapse = null
+    state: {
+      handler() {
+        this.forceCollapse = null
+        if (getStorage(STORAGE_COLLAPSE_ALL)) {
+          this.setExpandToAll(false)
+        }
+      },
+      immediate: true,
     },
   },
 
   methods: {
-    toggle (dataType, currentExpanded, event = null) {
-      if (event) {
-        if (event.ctrlKey || event.metaKey) {
-          this.setExpandToAll(false)
-          this.$emit('collapse-all')
-          return
-        } else if (event.shiftKey) {
-          this.setExpandToAll(true)
-          this.$emit('expand-all')
-          return
-        }
+    toggle(dataType, currentExpanded, event = null) {
+      if (event?.shiftKey) {
+        this.setExpandToAll(!currentExpanded)
+        return
       }
-      Vue.set(this.expandedState, dataType, !currentExpanded)
+      this.expandedState[dataType] = !currentExpanded
     },
 
-    setExpandToAll (value) {
-      this.dataTypes.forEach(key => {
+    setExpandToAll(value) {
+      this.dataTypes.forEach((key) => {
         this.forceCollapse = value ? 'expand' : 'collapse'
-        Vue.set(this.expandedState, key, value)
+        this.expandedState[key] = value
       })
+      this.$emit(value ? 'expand-all' : 'collapse-all')
+      setStorage(STORAGE_COLLAPSE_ALL, !value)
     },
   },
 }
@@ -123,7 +128,7 @@ export default {
         :high-density="highDensity"
         :dim-after="dimAfter"
         @toggle="toggle"
-        @edit-state="(path, payload) => $emit('edit-state', path, payload, dataType)"
+        @edit-state="(path, payload) => $emit('editState', path, payload, dataType)"
       />
     </template>
   </div>

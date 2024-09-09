@@ -1,6 +1,6 @@
 <script lang="ts">
-import { computed, defineComponent } from '@vue/composition-api'
-import { hasPluginPermission, PluginPermission } from '@vue-devtools/shared-utils'
+import { computed, defineComponent } from 'vue'
+import { PluginPermission, hasPluginPermission } from '@vue-devtools/shared-utils'
 
 export default defineComponent({
   props: {
@@ -10,7 +10,7 @@ export default defineComponent({
     },
   },
 
-  setup (props) {
+  setup(props) {
     const enabled = computed(() => hasPluginPermission(props.plugin.id, PluginPermission.ENABLED))
     return {
       enabled,
@@ -24,8 +24,8 @@ export default defineComponent({
     :to="{
       name: 'plugin-details',
       params: {
-        pluginId: plugin.id
-      }
+        pluginId: plugin.id,
+      },
     }"
     class="flex items-center space-x-2 px-3 py-1 hover:bg-green-100 dark:hover:bg-green-800"
     :class="{
@@ -49,7 +49,7 @@ export default defineComponent({
 </template>
 
 <style lang="postcss" scoped>
-.vue-ui-icon /deep/ svg {
+.vue-ui-icon :deep(svg) {
   fill: currentColor;
 }
 </style>

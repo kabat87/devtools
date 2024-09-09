@@ -1,6 +1,12 @@
 <script lang="ts">
 import SplitPane from '@front/features/layout/SplitPane.vue'
 import PluginSourceIcon from '@front/features/plugin/PluginSourceIcon.vue'
+import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useLocalStorage } from '@vueuse/core'
+import { SharedData, getStorage } from '@vue-devtools/shared-utils'
+import { onSharedDataChange } from '@front/util/shared-data'
+import { formatTime } from '@front/util/format'
+import { useFonts } from '@front/util/fonts'
 import TimelineView from './TimelineView.vue'
 import TimelineScrollbar from './TimelineScrollbar.vue'
 import LayerItem from './LayerItem.vue'
@@ -8,19 +14,14 @@ import TimelineEventList from './TimelineEventList.vue'
 import TimelineEventInspector from './TimelineEventInspector.vue'
 import AskScreenshotPermission from './AskScreenshotPermission.vue'
 
-import { computed, onMounted, ref, watch, defineComponent, onUnmounted } from '@vue/composition-api'
-import { SharedData } from '@vue-devtools/shared-utils'
-import { onSharedDataChange } from '@front/util/shared-data'
-import { formatTime } from '@front/util/format'
-import { useFonts } from '@front/util/fonts'
 import {
-  useTime,
-  useLayers,
   resetTimeline,
-  useCursor,
-  useSelectedEvent,
-  useScreenshots,
   supportsScreenshot,
+  useCursor,
+  useLayers,
+  useScreenshots,
+  useSelectedEvent,
+  useTime,
 } from './composable'
 
 export default defineComponent({
@@ -35,7 +36,7 @@ export default defineComponent({
     PluginSourceIcon,
   },
 
-  setup () {
+  setup() {
     const {
       layers,
       vScroll,
@@ -48,7 +49,7 @@ export default defineComponent({
     } = useLayers()
     const layersEl = ref()
 
-    function applyScroll () {
+    function applyScroll() {
       if (layersEl.value && layersEl.value.scrollTop !== vScroll.value) {
         layersEl.value.scrollTop = vScroll.value
       }
@@ -64,7 +65,7 @@ export default defineComponent({
       applyScroll()
     })
 
-    function onLayersScroll (event: WheelEvent) {
+    function onLayersScroll(event: UIEvent) {
       const target = event.currentTarget as HTMLElement
       if (target.scrollTop !== vScroll.value) {
         vScroll.value = target.scrollTop
@@ -85,19 +86,22 @@ export default defineComponent({
     } = useSelectedEvent()
 
     // Auto scroll to selected event
-    watch(selectedEvent, event => {
-      if (!event) return
+    watch(selectedEvent, (event) => {
+      if (!event) {
+        return
+      }
 
       const size = endTime.value - startTime.value
 
       let isEventInViewPort: boolean
       if (event.layer.groupsOnly) {
         isEventInViewPort = (
-          (event.group.firstEvent.time >= startTime.value && event.group.firstEvent.time <= endTime.value) ||
-          (event.group.lastEvent.time >= startTime.value && event.group.lastEvent.time <= endTime.value) ||
-          (event.group.firstEvent.time <= startTime.value && event.group.lastEvent.time >= endTime.value)
+          (event.group.firstEvent.time >= startTime.value && event.group.firstEvent.time <= endTime.value)
+          || (event.group.lastEvent.time >= startTime.value && event.group.lastEvent.time <= endTime.value)
+          || (event.group.firstEvent.time <= startTime.value && event.group.lastEvent.time >= endTime.value)
         )
-      } else {
+      }
+      else {
         isEventInViewPort = event.time >= startTime.value && event.time <= endTime.value
       }
 
@@ -118,7 +122,7 @@ export default defineComponent({
 
     const { cursorTime } = useCursor()
 
-    const formattedCursorTime = computed(() => cursorTime.value ? formatTime(cursorTime.value, 'ms') : null)
+    const formattedCursorTime = computed(() => cursorTime.value ? formatTime(cursorTime.value / 1000, 'ms') : null)
 
     // Screenshots
 
@@ -137,7 +141,7 @@ export default defineComponent({
             'https://*/*',
             'file:///*',
           ],
-        }, granted => {
+        }, (granted) => {
           if (!granted) {
             /* Ask modal disabled for now */
             // askScreenshotPermission.value = true
@@ -152,8 +156,10 @@ export default defineComponent({
       showScreenshot,
     } = useScreenshots()
 
-    watch(cursorTime, value => {
-      if (!SharedData.timelineScreenshots) return
+    watch(cursorTime, (value) => {
+      if (!SharedData.timelineScreenshots) {
+        return
+      }
 
       let choice = null
       if (value != null) {
@@ -161,7 +167,8 @@ export default defineComponent({
         for (const screenshot of screenshots.value) {
           if (screenshot.time > value + 50) {
             break
-          } else {
+          }
+          else {
             choice = screenshot
           }
         }
@@ -171,10 +178,10 @@ export default defineComponent({
 
     // Zoom
 
-    let zoomTimer
-    let zoomDelayTimer
+    let zoomTimer: ReturnType<typeof setTimeout>
+    let zoomDelayTimer: ReturnType<typeof setTimeout>
 
-    function zoom (delta: number) {
+    function zoom(delta: number) {
       const wrapper: HTMLDivElement = document.querySelector('[data-id="timeline-view-wrapper"]')
       const viewWidth = wrapper.offsetWidth
       const size = endTime.value - startTime.value
@@ -198,7 +205,7 @@ export default defineComponent({
       endTime.value = end
     }
 
-    function zoomIn () {
+    function zoomIn() {
       zoom(-50)
       zoomDelayTimer = setTimeout(() => {
         zoomTimer = setInterval(() => {
@@ -208,7 +215,7 @@ export default defineComponent({
       window.addEventListener('mouseup', () => stopZoom())
     }
 
-    function zoomOut () {
+    function zoomOut() {
       zoom(50)
       zoomDelayTimer = setTimeout(() => {
         zoomTimer = setInterval(() => {
@@ -218,7 +225,7 @@ export default defineComponent({
       window.addEventListener('mouseup', () => stopZoom())
     }
 
-    function stopZoom () {
+    function stopZoom() {
       clearInterval(zoomTimer)
       clearTimeout(zoomDelayTimer)
     }
@@ -229,10 +236,10 @@ export default defineComponent({
 
     // Move buttons
 
-    let moveTimer
-    let moveDelayTimer
+    let moveTimer: ReturnType<typeof setTimeout>
+    let moveDelayTimer: ReturnType<typeof setTimeout>
 
-    function move (delta: number) {
+    function move(delta: number) {
       const wrapper: HTMLDivElement = document.querySelector('[data-id="timeline-view-wrapper"]')
       const viewWidth = wrapper.offsetWidth
       const size = endTime.value - startTime.value
@@ -250,7 +257,7 @@ export default defineComponent({
       endTime.value = end
     }
 
-    function moveLeft () {
+    function moveLeft() {
       move(-25)
       moveDelayTimer = setTimeout(() => {
         moveTimer = setInterval(() => {
@@ -260,7 +267,7 @@ export default defineComponent({
       window.addEventListener('mouseup', () => stopMove())
     }
 
-    function moveRight () {
+    function moveRight() {
       move(25)
       moveDelayTimer = setTimeout(() => {
         moveTimer = setInterval(() => {
@@ -270,7 +277,7 @@ export default defineComponent({
       window.addEventListener('mouseup', () => stopMove())
     }
 
-    function stopMove () {
+    function stopMove() {
       clearInterval(moveTimer)
       clearTimeout(moveDelayTimer)
     }
@@ -282,6 +289,42 @@ export default defineComponent({
     // Fonts
 
     const { loaded: fontsLoaded } = useFonts()
+
+    // Restore layer selection
+
+    watch(layers, (value) => {
+      if (!selectedLayer.value && value.length) {
+        const layerId = getStorage('selected-layer-id')
+        if (layerId) {
+          const layer = value.find(layer => layer.id === layerId)
+          if (layer) {
+            selectLayer(layer)
+          }
+        }
+      }
+    })
+
+    // Layout settings
+
+    const hideTimelineCanvas = useLocalStorage('split-pane-collapsed-left-timeline-right', false)
+    const hideEvents = useLocalStorage('split-pane-collapsed-right-timeline-right', false)
+
+    // We shouldn't hide both at the same time
+    watch(() => [hideTimelineCanvas.value, hideEvents.value], ([a, b], old) => {
+      if (a && a === b) {
+        nextTick(() => {
+          if (old?.[0]) {
+            hideTimelineCanvas.value = false
+          }
+          else {
+            hideEvents.value = false
+          }
+        })
+      }
+    }, {
+      immediate: true,
+      deep: true,
+    })
 
     return {
       fontsLoaded,
@@ -308,6 +351,8 @@ export default defineComponent({
       zoomOut,
       moveLeft,
       moveRight,
+      hideTimelineCanvas,
+      hideEvents,
     }
   },
 })
@@ -323,7 +368,118 @@ export default defineComponent({
     >
       <template #left>
         <div class="flex flex-col h-full">
-          <div class="h-4 flex-none border-b border-gray-200 dark:border-gray-800 box-content" />
+          <div class="h-8 flex-none border-b border-gray-200 dark:border-gray-700 flex items-center">
+            <VueDropdown>
+              <template #trigger>
+                <VueButton
+                  v-tooltip="'Select layers'"
+                  class="flat"
+                  icon-left="layers"
+                >
+                  {{ layers.length }} layer{{ layers.length === 1 ? '' : 's' }}
+                </VueButton>
+              </template>
+
+              <div
+                style="max-height: 250px;"
+                class="overflow-x-hidden overflow-y-auto"
+              >
+                <div class="flex flex-col">
+                  <VueSwitch
+                    v-for="layer of allLayers"
+                    :key="layer.id"
+                    :model-value="!isLayerHidden(layer)"
+                    class="extend-left px-2 py-1 hover:bg-green-100 dark:hover:bg-green-900"
+                    @update:model-value="value => setLayerHidden(layer, !value)"
+                  >
+                    <div class="flex items-center space-x-2 max-w-xs">
+                      <div
+                        class="flex-none w-3 h-3 rounded-full"
+                        :style="{
+                          backgroundColor: `#${layer.color.toString(16).padStart(6, '0')}`,
+                        }"
+                      />
+
+                      <div class="flex-1 truncate">
+                        {{ layer.label }}
+                      </div>
+
+                      <PluginSourceIcon
+                        v-if="layer.pluginId"
+                        :plugin-id="layer.pluginId"
+                        class="flex-none"
+                      />
+                    </div>
+                  </VueSwitch>
+                </div>
+              </div>
+            </VueDropdown>
+
+            <VueButton
+              v-tooltip="$shared.timelineRecording ? 'Stop recording' : 'Start recording'"
+              class="icon-button flat"
+              :class="{
+                'recording-btn': $shared.timelineRecording,
+              }"
+              icon-left="fiber_manual_record"
+              @click="$shared.timelineRecording = !$shared.timelineRecording"
+            >
+              <div v-if="$shared.timelineRecording" class="absolute inset-2.5 rounded-full recording-shadow" />
+            </VueButton>
+
+            <VueButton
+              v-tooltip="'Clear all timelines'"
+              class="icon-button flat"
+              icon-left="delete_sweep"
+              @click="resetTimeline()"
+            />
+
+            <div class="flex-1" />
+
+            <div v-if="!$shared.timelineRecording" class="text-gray-500 dark:text-gray-400 text-xs px-2">
+              Not recording
+            </div>
+
+            <VueDropdown
+              placement="bottom-end"
+            >
+              <template #trigger>
+                <VueButton
+                  icon-left="more_vert"
+                  class="icon-button flat"
+                />
+              </template>
+
+              <VueSwitch
+                v-model="hideTimelineCanvas"
+                class="w-full px-3 py-1 extend-left"
+              >
+                Hide timeline canvas
+              </VueSwitch>
+
+              <VueSwitch
+                v-model="hideEvents"
+                class="w-full px-3 py-1 extend-left"
+              >
+                Hide events explorer
+              </VueSwitch>
+
+              <VueSwitch
+                v-model="$shared.timelineTimeGrid"
+                class="w-full px-3 py-1 extend-left"
+              >
+                Time grid
+              </VueSwitch>
+
+              <VueSwitch
+                v-if="supportsScreenshot"
+                v-model="$shared.timelineScreenshots"
+                class="w-full px-3 py-1 extend-left"
+              >
+                Screenshots
+              </VueSwitch>
+            </VueDropdown>
+          </div>
 
           <div
             ref="layersEl"
@@ -338,8 +494,7 @@ export default defineComponent({
               :hover="hoverLayerId === layer.id"
               :selected="selectedLayer === layer"
               class="flex-none"
-              @mouseenter.native="hoverLayerId = layer.id"
-              @mouseleave.native="hoverLayerId = null"
+              @mouseenter="hoverLayerId = layer.id"
               @select="selectLayer(layer)"
               @hide="setLayerHidden(layer, true)"
             />
@@ -358,39 +513,39 @@ export default defineComponent({
         >
           <template #left>
             <div class="h-full flex flex-col select-none">
-              <div class="flex items-center flex-none border-b border-gray-200 dark:border-gray-800">
+              <div class="h-8 flex items-center flex-none border-b border-gray-200 dark:border-gray-700">
                 <VueButton
                   icon-left="arrow_left"
                   class="flex-none w-4 h-4 p-0 flat zoom-btn"
-                  @mousedown.native="moveLeft()"
+                  @mousedown="moveLeft()"
                 />
 
                 <TimelineScrollbar
-                  :min.sync="minTime"
-                  :max.sync="maxTime"
-                  :start.sync="startTime"
-                  :end.sync="endTime"
+                  v-model:start="startTime"
+                  v-model:end="endTime"
+                  :min="minTime"
+                  :max="maxTime"
                   class="flex-1"
                 />
 
                 <VueButton
                   icon-left="arrow_right"
                   class="flex-none w-4 h-4 p-0 flat zoom-btn"
-                  @mousedown.native="moveRight()"
+                  @mousedown="moveRight()"
                 />
 
                 <VueButton
                   v-tooltip="'Zoom in'"
                   icon-left="add"
                   class="flex-none w-4 h-4 p-0 flat zoom-btn"
-                  @mousedown.native="zoomIn()"
+                  @mousedown="zoomIn()"
                 />
 
                 <VueButton
                   v-tooltip="'Zoom out'"
                   icon-left="remove"
                   class="flex-none w-4 h-4 p-0 flat zoom-btn"
-                  @mousedown.native="zoomOut()"
+                  @mousedown="zoomOut()"
                 />
               </div>
               <TimelineView
@@ -401,7 +556,7 @@ export default defineComponent({
               <div class="absolute top-0 left-0 w-full pointer-events-none flex items-center justify-center">
                 <div
                   v-if="formattedCursorTime"
-                  class="text-gray-700 dark:text-gray-300 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 px-1 py-0.5 rounded-full text-2xs font-mono leading-none mt-1 flex items-center space-x-0.5"
+                  class="text-gray-700 dark:text-gray-300 bg-white dark:bg-black border border-gray-200 dark:border-gray-700 px-1 py-0.5 rounded-full text-2xs font-mono leading-none mt-1 flex items-center space-x-0.5"
                 >
                   <VueIcon
                     icon="schedule"
@@ -433,81 +588,9 @@ export default defineComponent({
               </template>
             </SplitPane>
           </template>
-        </splitpane>
+        </SplitPane>
       </template>
     </SplitPane>
-
-    <portal to="header-end">
-      <VueDropdown>
-        <template #trigger>
-          <VueButton
-            v-tooltip="'Select layers'"
-            class="icon-button flat"
-            icon-left="layers"
-          />
-        </template>
-
-        <div
-          style="max-height: 250px;"
-          class="overflow-x-hidden overflow-y-auto"
-        >
-          <div class="flex flex-col">
-            <VueSwitch
-              v-for="layer of allLayers"
-              :key="layer.id"
-              :value="!isLayerHidden(layer)"
-              class="extend-left px-2 py-1 hover:bg-green-100 dark:hover:bg-green-900"
-              @update="value => setLayerHidden(layer, !value)"
-            >
-              <div class="flex items-center space-x-2 max-w-xs">
-                <div
-                  class="flex-none w-3 h-3 rounded-full"
-                  :style="{
-                    backgroundColor: `#${layer.color.toString(16).padStart(6, '0')}`
-                  }"
-                />
-
-                <div class="flex-1 truncate">
-                  {{ layer.label }}
-                </div>
-
-                <PluginSourceIcon
-                  v-if="layer.pluginId"
-                  :plugin-id="layer.pluginId"
-                  class="flex-none"
-                />
-              </div>
-            </VueSwitch>
-          </div>
-        </div>
-      </VueDropdown>
-
-      <VueButton
-        v-tooltip="'Clear all timelines'"
-        class="icon-button flat"
-        icon-left="delete_sweep"
-        @click="resetTimeline()"
-      />
-    </portal>
-
-    <portal to="more-menu">
-      <VueSwitch
-        v-model="$shared.timelineTimeGrid"
-        class="w-full px-3 py-1 extend-left"
-      >
-        Time grid
-      </VueSwitch>
-
-      <VueSwitch
-        v-if="supportsScreenshot"
-        v-model="$shared.timelineScreenshots"
-        class="w-full px-3 py-1 extend-left"
-      >
-        Screenshots
-      </VueSwitch>
-
-      <div class="border-t border-gray-200 dark:border-gray-800 my-1" />
-    </portal>
 
     <AskScreenshotPermission
       v-if="askScreenshotPermission"
@@ -524,8 +607,22 @@ export default defineComponent({
 
 .zoom-btn {
   @apply rounded-none;
-  /deep/ .vue-ui-icon {
+  :deep(.vue-ui-icon) {
     @apply w-3.5 h-3.5 mr-0 left-0 right-0 !important;
   }
+}
+
+.recording-btn {
+  :deep(.vue-ui-icon) {
+    @apply animate-pulse duration-1000;
+
+    svg {
+      fill: theme('colors.red.500') !important;
+    }
+  }
+}
+
+.recording-shadow {
+  box-shadow: theme('colors.red.500') 0 0 8px;
 }
 </style>

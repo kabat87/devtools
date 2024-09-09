@@ -1,11 +1,11 @@
 <script lang="ts">
 import SplitPane from '@front/features/layout/SplitPane.vue'
+import { defineComponent, onMounted, provide, ref } from 'vue'
+import { onKeyDown } from '@front/util/keyboard'
 import ComponentTreeNode from './ComponentTreeNode.vue'
 import SelectedComponentPane from './SelectedComponentPane.vue'
 
-import { onMounted, ref, provide, defineComponent } from '@vue/composition-api'
-import { onKeyDown, onKeyUp } from '@front/util/keyboard'
-import { useComponentPick, useComponents, loadComponent } from './composable'
+import { loadComponent, useComponentPick, useComponents } from './composable'
 
 export default defineComponent({
   components: {
@@ -14,7 +14,7 @@ export default defineComponent({
     SelectedComponentPane,
   },
 
-  setup () {
+  setup() {
     const {
       rootInstances,
       requestComponentTree,
@@ -27,6 +27,7 @@ export default defineComponent({
     subscribeToSelectedData()
 
     onMounted(() => {
+      requestComponentTree()
       selectLastComponent()
     })
 
@@ -40,26 +41,44 @@ export default defineComponent({
       stopPickingComponent,
     } = useComponentPick()
 
-    onKeyDown(event => {
-      if (event.key === 'f' && event.altKey) {
+    onKeyDown((event) => {
+      // ƒ,ß,® - these are the result keys in Mac with altKey pressed
+      if ((event.key === 'f' || event.key === 'ƒ') && event.altKey) {
         treeFilterInput.value.focus()
         return false
       }
-    })
-
-    onKeyUp(event => {
-      if (event.key === 's' && !pickingComponent.value) {
+      else if ((event.key === 's' || event.key === 'ß') && event.altKey && !pickingComponent.value) {
         startPickingComponent()
-      } else if (event.key === 'Escape' && pickingComponent.value) {
-        stopPickingComponent()
+        return false
       }
-    })
+      else if (event.key === 'Escape' && pickingComponent.value) {
+        stopPickingComponent()
+        return false
+      }
+      else if ((event.key === 'r' || event.key === '®') && (event.ctrlKey || event.metaKey) && event.altKey) {
+        refresh()
+        return false
+      }
+    }, true)
 
     // Refresh
 
-    function refresh () {
+    const animateRefresh = ref(false)
+    let animateRefreshTimer
+
+    function refresh() {
       requestComponentTree(null)
       loadComponent(selectedComponentId.value)
+
+      // Animation
+      animateRefresh.value = false
+      clearTimeout(animateRefreshTimer)
+      requestAnimationFrame(() => {
+        animateRefresh.value = true
+        animateRefreshTimer = setTimeout(() => {
+          animateRefresh.value = false
+        }, 1000)
+      })
     }
 
     // Scroller
@@ -75,6 +94,7 @@ export default defineComponent({
       startPickingComponent,
       stopPickingComponent,
       refresh,
+      animateRefresh,
       treeScroller,
     }
   },
@@ -88,18 +108,119 @@ export default defineComponent({
     >
       <template #left>
         <div class="flex flex-col h-full">
-          <VueInput
-            ref="treeFilterInput"
-            v-model="treeFilter"
-            v-tooltip="{
-              content: $t('ComponentTree.filter.tooltip'),
-              html: true
-            }"
-            icon-left="search"
-            placeholder="Find components..."
-            select-all
-            class="search flat border-b border-gray-200 dark:border-gray-800"
-          />
+          <div class="flex items-center border-b border-gray-200 dark:border-gray-700">
+            <VueInput
+              ref="treeFilterInput"
+              v-model="treeFilter"
+              v-tooltip="{
+                content: $t('ComponentTree.filter.tooltip'),
+                html: true,
+              }"
+              icon-left="search"
+              placeholder="Find components..."
+              select-all
+              class="search flat !min-w-0 flex-1"
+            />
+
+            <VueButton
+              v-tooltip="{
+                content: $t('ComponentTree.select.tooltip'),
+                html: true,
+              }"
+              class="icon-button flat"
+              icon-left="gps_fixed"
+              @click="startPickingComponent()"
+            />
+
+            <VueButton
+              v-tooltip="{
+                content: $t('ComponentTree.refresh.tooltip'),
+                html: true,
+              }"
+              class="icon-button flat"
+              :class="{
+                'animate-icon': animateRefresh,
+              }"
+              icon-left="refresh"
+              @click="refresh()"
+            />
+
+            <VueDropdown
+              placement="bottom-end"
+            >
+              <template #trigger>
+                <VueButton
+                  icon-left="more_vert"
+                  class="icon-button flat"
+                />
+              </template>
+
+              <div class="space-y-1 px-3 py-2 text-sm">
+                <div>Component names:</div>
+
+                <VueGroup
+                  v-model="$shared.componentNameStyle"
+                >
+                  <VueGroupButton
+                    value="original"
+                    label="Original"
+                  />
+                  <VueGroupButton
+                    value="class"
+                    label="PascalCase"
+                  />
+                  <VueGroupButton
+                    value="kebab"
+                    label="kebab-case"
+                  />
+                </VueGroup>
+              </div>
+
+              <div class="space-y-1 px-3 py-2 text-sm">
+                <VueSwitch v-model="$shared.performanceMonitoringEnabled">
+                  Performance monitoring
+                </VueSwitch>
+                <div class="flex items-center space-x-1 text-xs opacity-50">
+                  <span>Turn off if your app is slowed down</span>
+                </div>
+              </div>
+
+              <div class="space-y-1 px-3 py-2 text-sm">
+                <VueSwitch v-model="$shared.trackUpdates">
+                  Update tracking
+                </VueSwitch>
+                <div class="flex items-center space-x-1 text-xs opacity-50">
+                  <span>Turn off if your app is slowed down</span>
+                </div>
+              </div>
+
+              <div class="space-y-1 px-3 py-2 text-sm">
+                <VueSwitch v-model="$shared.editableProps">
+                  Editable props
+                </VueSwitch>
+                <div class="flex items-center space-x-1 text-xs opacity-50">
+                  <VueIcon
+                    icon="warning"
+                    class="w-4 h-4 flex-none"
+                  />
+                  <span>May print warnings in the console</span>
+                </div>
+              </div>
+
+              <div class="space-y-1 px-3 py-2 text-sm">
+                <VueSwitch v-model="$shared.flashUpdates">
+                  Highlight updates
+                </VueSwitch>
+                <div class="flex items-center space-x-1 text-xs opacity-50">
+                  <VueIcon
+                    icon="warning"
+                    class="w-4 h-4 flex-none"
+                  />
+                  <span>Don't enable if you are sensitive to flashing</span>
+                </div>
+              </div>
+            </VueDropdown>
+          </div>
 
           <div
             ref="treeScroller"
@@ -119,64 +240,7 @@ export default defineComponent({
       </template>
     </SplitPane>
 
-    <portal to="more-menu">
-      <div class="space-y-1 px-3 py-2 text-sm">
-        <div>Component names:</div>
-
-        <VueGroup
-          v-model="$shared.componentNameStyle"
-        >
-          <VueGroupButton
-            value="original"
-            label="Original"
-          />
-          <VueGroupButton
-            value="class"
-            label="PascalCase"
-          />
-          <VueGroupButton
-            value="kebab"
-            label="kebab-case"
-          />
-        </VueGroup>
-      </div>
-
-      <div class="space-y-1 px-3 py-2 text-sm">
-        <VueSwitch v-model="$shared.editableProps">
-          Editable props
-        </VueSwitch>
-        <div class="flex items-center space-x-1 text-xs opacity-50">
-          <VueIcon
-            icon="warning"
-            class="w-4 h-4 flex-none"
-          />
-          <span>May print warnings in the console</span>
-        </div>
-      </div>
-
-      <div class="border-t border-gray-200 dark:border-gray-800 my-1" />
-    </portal>
-
-    <portal to="header-end">
-      <VueButton
-        v-tooltip="{
-          content: $t('ComponentTree.select.tooltip'),
-          html: true
-        }"
-        class="icon-button flat"
-        icon-left="gps_fixed"
-        @click="startPickingComponent()"
-      />
-
-      <VueButton
-        v-tooltip="'Force refresh'"
-        class="icon-button flat"
-        icon-left="refresh"
-        @click="refresh()"
-      />
-    </portal>
-
-    <portal to="root">
+    <SafeTeleport to="#root">
       <div
         v-if="pickingComponent"
         class="absolute inset-0 bg-white bg-opacity-75 dark:bg-black dark:bg-opacity-75 z-100 flex items-center justify-center"
@@ -198,20 +262,30 @@ export default defineComponent({
           </div>
         </div>
       </div>
-    </portal>
+    </SafeTeleport>
   </div>
 </template>
 
 <style lang="postcss" scoped>
 .search {
-  >>> {
-    .input {
-      height: 39px !important;
-    }
+  :deep(.input) {
+    height: 32px !important;
+  }
 
-    .content {
-      border: none !important;
-    }
+  :deep(.content) {
+    border: none !important;
+  }
+}
+
+.animate-icon {
+  :deep(.vue-ui-icon) {
+    animation: refresh 1s ease-out;
+  }
+}
+
+@keyframes refresh {
+  100% {
+    transform: rotate(360deg);
   }
 }
 </style>

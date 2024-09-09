@@ -1,13 +1,12 @@
 <script lang="ts">
-import AppHeaderSelect from '../header/AppHeaderSelect.vue'
-import AppSelectItem from './AppSelectItem.vue'
-
-import { watch, defineComponent, computed } from '@vue/composition-api'
+import { computed, defineComponent, watch } from 'vue'
 import { BridgeEvents, SharedData } from '@vue-devtools/shared-utils'
-import { useApps, pendingSelectAppId, scanLegacyApps } from '@front/features/apps'
+import { pendingSelectAppId, scanLegacyApps, useApps } from '@front/features/apps'
 import { useOrientation } from '@front/features/layout/orientation'
-import { useRouter } from '@front/util/router'
+import { useRouter } from 'vue-router'
+import AppHeaderSelect from '../header/AppHeaderSelect.vue'
 import { useBridge } from '../bridge'
+import AppSelectItem from './AppSelectItem.vue'
 import { useVueVersionCheck } from './vue-version-check'
 
 export default defineComponent({
@@ -16,7 +15,7 @@ export default defineComponent({
     AppSelectItem,
   },
 
-  setup () {
+  setup() {
     const router = useRouter()
     const { bridge } = useBridge()
 
@@ -27,7 +26,7 @@ export default defineComponent({
       selectApp,
     } = useApps()
 
-    watch(currentAppId, value => {
+    watch(currentAppId, (value) => {
       if (pendingSelectAppId.value !== value) {
         pendingSelectAppId.value = value
         bridge.send(BridgeEvents.TO_BACK_APP_SELECT, value)
@@ -44,7 +43,8 @@ export default defineComponent({
         if (SharedData.pageConfig?.defaultSelectedAppId) {
           targetId = SharedData.pageConfig.defaultSelectedAppId
           initDefaultAppId = true
-        } else if (currentAppId.value !== apps.value[0].id) {
+        }
+        else if (currentAppId.value !== apps.value[0].id) {
           targetId = apps.value[0].id
         }
         if (targetId) {
@@ -86,30 +86,14 @@ export default defineComponent({
   >
     <template #trigger>
       <VueButton
-        class="flat"
-        icon-left="wysiwyg"
-        :icon-right="orientation === 'landscape' ? 'arrow_drop_down' : null"
-        :class="{
-          'icon-button': orientation === 'portrait'
-        }"
+        class="flat icon-button"
       >
-        <div class="flex items-center space-x-2">
-          <template v-if="orientation === 'landscape'">
-            <span v-if="currentApp">
-              {{ currentApp.name }}
-            </span>
-            <span
-              v-else
-              class="opacity-50"
-            >
-              No app
-            </span>
-          </template>
-
+        <div class="flex items-center space-x-2 relative">
+          <img src="~@front/assets/vue-logo.svg" class="w-8 h-8">
           <VueIcon
             v-if="hasNewVueVersion"
             icon="new_releases"
-            class="text-green-500"
+            class="text-green-400 absolute right-0 bottom-0 w-4 h-4"
           />
         </div>
       </VueButton>
@@ -118,6 +102,7 @@ export default defineComponent({
     <template #default="{ item }">
       <AppSelectItem
         :app="item"
+        :selected="currentApp === item"
       />
     </template>
 

@@ -1,6 +1,7 @@
-import { Context, DevtoolsPluginApi, Hookable } from './api'
-import { PluginDescriptor } from './plugin'
-import { HOOK_PLUGIN_SETTINGS_SET } from './const'
+import type { Context, DevtoolsPluginApi, Hookable } from './api/index.js'
+import type { PluginDescriptor } from './plugin.js'
+import { HOOK_PLUGIN_SETTINGS_SET } from './const.js'
+import { now } from './time.js'
 
 interface QueueItem {
   method: string
@@ -20,7 +21,7 @@ export class ApiProxy<TTarget extends DevtoolsPluginApi<any> = DevtoolsPluginApi
   hook: any
   fallbacks: Record<string, any>
 
-  constructor (plugin: PluginDescriptor, hook: any) {
+  constructor(plugin: PluginDescriptor, hook: any) {
     this.target = null
     this.targetQueue = []
     this.onQueue = []
@@ -41,21 +42,26 @@ export class ApiProxy<TTarget extends DevtoolsPluginApi<any> = DevtoolsPluginApi
       const raw = localStorage.getItem(localSettingsSaveId)
       const data = JSON.parse(raw)
       Object.assign(currentSettings, data)
-    } catch (e) {
+    }
+    catch (e) {
       // noop
     }
 
     this.fallbacks = {
-      getSettings () {
+      getSettings() {
         return currentSettings
       },
-      setSettings (value) {
+      setSettings(value) {
         try {
           localStorage.setItem(localSettingsSaveId, JSON.stringify(value))
-        } catch (e) {
+        }
+        catch (e) {
           // noop
         }
         currentSettings = value
+      },
+      now() {
+        return now()
       },
     }
 
@@ -71,7 +77,8 @@ export class ApiProxy<TTarget extends DevtoolsPluginApi<any> = DevtoolsPluginApi
       get: (_target, prop: string) => {
         if (this.target) {
           return this.target.on[prop]
-        } else {
+        }
+        else {
           return (...args) => {
             this.onQueue.push({
               method: prop,
@@ -86,9 +93,11 @@ export class ApiProxy<TTarget extends DevtoolsPluginApi<any> = DevtoolsPluginApi
       get: (_target, prop: string) => {
         if (this.target) {
           return this.target[prop]
-        } else if (prop === 'on') {
+        }
+        else if (prop === 'on') {
           return this.proxiedOn
-        } else if (Object.keys(this.fallbacks).includes(prop)) {
+        }
+        else if (Object.keys(this.fallbacks).includes(prop)) {
           return (...args) => {
             this.targetQueue.push({
               method: prop,
@@ -97,9 +106,10 @@ export class ApiProxy<TTarget extends DevtoolsPluginApi<any> = DevtoolsPluginApi
             })
             return this.fallbacks[prop](...args)
           }
-        } else {
+        }
+        else {
           return (...args) => {
-            return new Promise(resolve => {
+            return new Promise((resolve) => {
               this.targetQueue.push({
                 method: prop,
                 args,
@@ -112,7 +122,7 @@ export class ApiProxy<TTarget extends DevtoolsPluginApi<any> = DevtoolsPluginApi
     })
   }
 
-  async setRealTarget (target: TTarget) {
+  async setRealTarget(target: TTarget) {
     this.target = target
 
     for (const item of this.onQueue) {

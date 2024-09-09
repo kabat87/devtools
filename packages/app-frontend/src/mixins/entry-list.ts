@@ -1,4 +1,8 @@
-import { defineComponent } from '@vue/composition-api'
+/* eslint-disable eslint-comments/no-unlimited-disable */
+/* eslint-disable */
+// @ts-nocheck (Unused file)
+
+import { defineComponent } from 'vue'
 import debounce from 'lodash/debounce'
 
 export default function ({
@@ -10,17 +14,17 @@ export default function ({
       inspectedIndex: 'refreshScrollToInspected',
     },
 
-    mounted () {
+    mounted() {
       this.refreshScrollToInspected()
     },
 
-    activated () {
+    activated() {
       this.refreshScrollToInspected()
     },
 
     methods: {
-      refreshScrollToInspected () {
-        if (this.inspectedIndex) this.scrollIntoInspected(this.inspectedIndex as number)
+      refreshScrollToInspected() {
+        if (this.inspectedIndex) { this.scrollIntoInspected(this.inspectedIndex as number) }
       },
 
       scrollIntoInspected: debounce(async function (index) {
@@ -40,7 +44,8 @@ export default function ({
         const scrollTop = scroller.scrollTop
         if (top < scrollTop) {
           scroller.scrollTop = top
-        } else if (top + height > scrollTop + parentHeight) {
+        }
+        else if (top + height > scrollTop + parentHeight) {
           scroller.scrollTop = top + height - parentHeight
         }
       } as (this: any, index: number) => Promise<void>, 200, {
@@ -50,8 +55,8 @@ export default function ({
   })
 }
 
-function waitForFrame () {
-  return new Promise(resolve => {
+function waitForFrame() {
+  return new Promise((resolve) => {
     requestAnimationFrame(resolve)
   })
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { ref, computed, watch, defineComponent } from '@vue/composition-api'
+import { computed, defineComponent, ref } from 'vue'
 import { SharedData } from '@vue-devtools/shared-utils'
 import { useOrientation } from '@front/features/layout/orientation'
 
@@ -20,8 +20,8 @@ export default defineComponent({
       default: null,
     },
   },
-
-  setup (props, { emit }) {
+  emits: ['select'],
+  setup(props, { emit }) {
     /* Open/Close */
 
     const isShown = ref(false)
@@ -40,14 +40,16 @@ export default defineComponent({
     let pendingOperation = null
     let operationTimer = null
 
-    function queueOperation (type, delay) {
-      if (disabled) return
+    function queueOperation(type, delay) {
+      if (disabled) {
+        return
+      }
       pendingOperation = type
       clearTimeout(operationTimer)
       operationTimer = setTimeout(() => applyOperation(), delay)
     }
 
-    function applyOperation () {
+    function applyOperation() {
       if (pendingOperation) {
         pendingOperation()
       }
@@ -55,7 +57,7 @@ export default defineComponent({
       clearTimeout(operationTimer)
     }
 
-    function queueOpen (delay = true) {
+    function queueOpen(delay = true) {
       queueOperation(() => {
         isShown.value = true
 
@@ -67,7 +69,7 @@ export default defineComponent({
       }, delay ? 250 : 1)
     }
 
-    function queueClose (delay = true) {
+    function queueClose(delay = true) {
       toggleCloseEnabled = false
       clearTimeout(toggleCloseTimer)
       queueOperation(() => {
@@ -75,12 +77,13 @@ export default defineComponent({
       }, delay ? 300 : 1)
     }
 
-    function toggle () {
+    function toggle() {
       if (isShown.value) {
         if (toggleCloseEnabled) {
           queueClose(false)
         }
-      } else {
+      }
+      else {
         // We open also when it's already open and
         // when the button close is disabled
         // so we cancel the popper autoclose
@@ -91,7 +94,7 @@ export default defineComponent({
 
     /* Select */
 
-    function select (item) {
+    function select(item) {
       disabled = true
       emit('select', item)
       // Disable menu for a short time after selecting an item
@@ -102,14 +105,14 @@ export default defineComponent({
 
     const selectedIndex = computed(() => props.items.indexOf(props.selectedItem))
 
-    function selectNext () {
+    function selectNext() {
       const index = selectedIndex.value + 1
       if (index < props.items.length) {
         select(props.items[index])
       }
     }
 
-    function selectPrevious () {
+    function selectPrevious() {
       const index = selectedIndex.value - 1
       if (index >= 0) {
         select(props.items[index])
@@ -118,12 +121,15 @@ export default defineComponent({
 
     let wheelEnabled = true
 
-    function onMouseWheel (e: WheelEvent) {
-      if (!wheelEnabled) return
+    function onMouseWheel(e: WheelEvent) {
+      if (!wheelEnabled) {
+        return
+      }
 
       if (e.deltaY > 0) {
         selectNext()
-      } else {
+      }
+      else {
         selectPrevious()
       }
 
@@ -156,11 +162,10 @@ export default defineComponent({
 
 <template>
   <VueDropdown
-    placement="bottom-start"
+    v-model="isShown"
+    :placement="orientation === 'landscape' ? 'right-start' : 'bottom-start'"
     :triggers="[]"
     :offset="[0, 0]"
-    :shown.sync="isShown"
-    :show-group="`header-select-${_uid}`"
     :delay="0"
     :auto-hide="false"
     @apply-show="isShowApplied = true"
@@ -179,7 +184,7 @@ export default defineComponent({
             :icon-left="selectedItem.icon"
             :icon-right="orientation === 'landscape' ? 'arrow_drop_down' : null"
             :class="{
-              'icon-button': orientation === 'portrait'
+              'icon-button': orientation === 'portrait',
             }"
           >
             <template v-if="orientation === 'landscape'">
@@ -204,7 +209,7 @@ export default defineComponent({
           :key="index"
           :icon-left="item.icon || optionIcon"
           :class="{
-            selected: selectedItem === item
+            selected: selectedItem === item,
           }"
           @click="select(item)"
         >
@@ -215,7 +220,7 @@ export default defineComponent({
 
         <div
           v-if="$shared.showMenuScrollTip"
-          class="text-xs flex items-center space-x-2 text-gray-500 pl-4 pr-1 py-1 border-t border-gray-200 dark:border-gray-800 group"
+          class="text-xs flex items-center space-x-2 text-gray-500 pl-4 pr-1 py-1 border-t border-gray-200 dark:border-gray-700 group"
         >
           <span>Scroll to switch</span>
           <VueIcon icon="mouse" />
@@ -241,18 +246,18 @@ export default defineComponent({
     @apply bg-gray-700 text-gray-100 !important;
   }
 
-  >>> svg {
+  :deep(svg) {
     fill: currentColor !important;
   }
 }
 
-.vue-ui-dropdown-button /deep/ {
+.vue-ui-dropdown-button {
   min-height: 32px;
   height: auto;
   padding-top: 6px;
   padding-bottom: 6px;
 
-  .default-slot {
+  :deep(.default-slot) {
     flex: 1;
   }
 }

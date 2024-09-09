@@ -1,9 +1,11 @@
-import { defineBackend, BuiltinBackendFeature } from '@vue-devtools/app-backend-api'
+import { BuiltinBackendFeature, defineBackend } from '@vue-devtools/app-backend-api'
 import { backendInjections, getComponentName } from '@vue-devtools/shared-utils'
-import { ComponentInstance } from '@vue/devtools-api'
+import type { ComponentInstance } from '@vue/devtools-api'
 import { editState, getCustomInstanceDetails, getInstanceDetails } from './components/data'
-import { getInstanceOrVnodeRect, findRelatedComponent, getRootElementsFromComponentInstance } from './components/el'
-import { getComponentParents, instanceMap, walkTree } from './components/tree'
+import { findRelatedComponent, getInstanceOrVnodeRect, getRootElementsFromComponentInstance } from './components/el'
+import { initPerf } from './components/perf.js'
+import { getComponentParents, getInstanceMap, walkTree } from './components/tree'
+import { initUpdateTracking } from './components/update-tracking.js'
 import { getInstanceName } from './components/util'
 import { wrapVueForEvents } from './events'
 import { setupPlugin } from './plugin'
@@ -13,58 +15,59 @@ export const backend = defineBackend({
   features: [
     BuiltinBackendFeature.FLUSH,
   ],
-  setup (api) {
-    api.on.getAppRecordName(payload => {
+  setup(api) {
+    api.on.getAppRecordName((payload) => {
       if (payload.app.name) {
         payload.name = payload.app.name
-      } else if (payload.app.$options.name) {
+      }
+      else if (payload.app.$options.name) {
         payload.name = payload.app.$options.name
       }
     })
 
-    api.on.getAppRootInstance(payload => {
+    api.on.getAppRootInstance((payload) => {
       payload.root = payload.app as unknown as ComponentInstance
     })
 
     api.on.walkComponentTree(async (payload, ctx) => {
-      payload.componentTreeData = await walkTree(payload.componentInstance, payload.filter, api, ctx)
+      payload.componentTreeData = await walkTree(payload.componentInstance, payload.filter, payload.recursively, api, ctx)
     })
 
     api.on.walkComponentParents((payload, ctx) => {
       payload.parentInstances = getComponentParents(payload.componentInstance, api, ctx)
     })
 
-    api.on.inspectComponent(payload => {
+    api.on.inspectComponent((payload) => {
       injectToUtils()
       payload.instanceData = getInstanceDetails(payload.componentInstance)
     })
 
-    api.on.getComponentBounds(payload => {
+    api.on.getComponentBounds((payload) => {
       payload.bounds = getInstanceOrVnodeRect(payload.componentInstance)
     })
 
-    api.on.getComponentName(payload => {
+    api.on.getComponentName((payload) => {
       const instance = payload.componentInstance
       payload.name = instance.fnContext ? getComponentName(instance.fnOptions) : getInstanceName(instance)
     })
 
-    api.on.getElementComponent(payload => {
+    api.on.getElementComponent((payload) => {
       payload.componentInstance = findRelatedComponent(payload.element)
     })
 
-    api.on.editComponentState(payload => {
+    api.on.editComponentState((payload) => {
       editState(payload, api.stateEditor)
     })
 
-    api.on.getComponentRootElements(payload => {
+    api.on.getComponentRootElements((payload) => {
       payload.rootElements = getRootElementsFromComponentInstance(payload.componentInstance)
     })
 
-    api.on.getComponentDevtoolsOptions(payload => {
+    api.on.getComponentDevtoolsOptions((payload) => {
       payload.options = payload.componentInstance.$options.devtools
     })
 
-    api.on.getComponentRenderCode(payload => {
+    api.on.getComponentRenderCode((payload) => {
       payload.code = payload.componentInstance.$options.render.toString()
     })
 
@@ -73,15 +76,19 @@ export const backend = defineBackend({
     })
   },
 
-  setupApp (api, appRecord) {
+  setupApp(api, appRecord) {
     const { Vue } = appRecord.options.meta
     const app = appRecord.options.app
 
     // State editor overrides
-    api.stateEditor.createDefaultSetCallback = state => {
+    api.stateEditor.createDefaultSetCallback = (state) => {
       return (obj, field, value) => {
-        if (state.remove || state.newKey) Vue.delete(obj, field)
-        if (!state.remove) Vue.set(obj, state.newKey || field, value)
+        if (state.remove || state.newKey) {
+          Vue.delete(obj, field)
+        }
+        if (!state.remove) {
+          Vue.set(obj, state.newKey || field, value)
+        }
       }
     }
 
@@ -91,12 +98,18 @@ export const backend = defineBackend({
 
     // Plugin
     setupPlugin(api, app, Vue)
+
+    // Perf
+    initPerf(api, app, Vue)
+    // Update tracking
+    initUpdateTracking(api, Vue)
   },
 })
 
 // @TODO refactor
-function injectToUtils () {
+function injectToUtils() {
   backendInjections.getCustomInstanceDetails = getCustomInstanceDetails
-  backendInjections.instanceMap = instanceMap
+  backendInjections.getCustomObjectDetails = () => undefined
+  backendInjections.instanceMap = getInstanceMap()
   backendInjections.isVueInstance = val => val._isVue
 }

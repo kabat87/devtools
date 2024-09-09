@@ -1,12 +1,13 @@
 <script lang="ts">
 import SplitPane from '@front/features/layout/SplitPane.vue'
 import EmptyPane from '@front/features/layout/EmptyPane.vue'
-import CustomInspectorNode from './CustomInspectorNode.vue'
-import CustomInspectorSelectedNodePane from './CustomInspectorSelectedNodePane.vue'
 
-import { watch, ref, provide, defineComponent } from '@vue/composition-api'
+import { defineComponent, provide, ref, watch } from 'vue'
 import { BridgeEvents } from '@vue-devtools/shared-utils'
 import { useBridge } from '@front/features/bridge'
+import PluginSourceIcon from '../../plugin/PluginSourceIcon.vue'
+import CustomInspectorSelectedNodePane from './CustomInspectorSelectedNodePane.vue'
+import CustomInspectorNode from './CustomInspectorNode.vue'
 import { useCurrentInspector } from './composable'
 
 export default defineComponent({
@@ -15,9 +16,10 @@ export default defineComponent({
     EmptyPane,
     CustomInspectorNode,
     CustomInspectorSelectedNodePane,
+    PluginSourceIcon,
   },
 
-  setup () {
+  setup() {
     const {
       currentInspector: inspector,
       refreshInspector,
@@ -42,13 +44,13 @@ export default defineComponent({
 
     // Keyboard
 
-    function selectNextChild (index) {
+    function selectNextChild(index: number) {
       if (index + 1 < inspector.value.rootNodes.length) {
         selectNode(inspector.value.rootNodes[index + 1])
       }
     }
 
-    function selectPreviousChild (index) {
+    function selectPreviousChild(index: number) {
       if (index - 1 >= 0) {
         selectNode(inspector.value.rootNodes[index - 1])
       }
@@ -59,7 +61,7 @@ export default defineComponent({
       bridge,
     } = useBridge()
 
-    function executeCustomAction (index: number) {
+    function executeCustomAction(index: number) {
       bridge.send(BridgeEvents.TO_BACK_CUSTOM_INSPECTOR_ACTION, {
         inspectorId: inspector.value.id,
         appId: inspector.value.appId,
@@ -86,12 +88,36 @@ export default defineComponent({
     >
       <template #left>
         <div class="flex flex-col h-full">
-          <VueInput
-            v-model="inspector.treeFilter"
-            icon-left="search"
-            :placeholder="inspector.treeFilterPlaceholder || 'Search...'"
-            class="search flat border-b border-gray-200 dark:border-gray-800"
-          />
+          <div class="border-b border-gray-200 dark:border-gray-700 flex items-center pr-2 h-8 box-content">
+            <VueInput
+              v-model="inspector.treeFilter"
+              icon-left="search"
+              :placeholder="inspector.treeFilterPlaceholder || 'Search...'"
+              class="search flat !min-w-0 flex-1 mr-2"
+            />
+
+            <template v-if="inspector?.actions">
+              <VueButton
+                v-for="(action, index) of inspector.actions"
+                :key="index"
+                v-tooltip="action.tooltip"
+                class="icon-button flat"
+                :icon-left="action.icon"
+                @click="executeCustomAction(index)"
+              />
+            </template>
+            <VueButton
+              v-tooltip="'Refresh'"
+              class="icon-button flat"
+              icon-left="refresh"
+              @click="refreshInspector()"
+            />
+
+            <PluginSourceIcon
+              :plugin-id="inspector.pluginId"
+              class="ml-2"
+            />
+          </div>
 
           <div
             ref="treeScroller"
@@ -112,25 +138,6 @@ export default defineComponent({
         <CustomInspectorSelectedNodePane />
       </template>
     </SplitPane>
-
-    <portal to="header-end">
-      <template v-if="inspector.actions">
-        <VueButton
-          v-for="(action, index) of inspector.actions"
-          :key="index"
-          v-tooltip="action.tooltip"
-          class="icon-button flat"
-          :icon-left="action.icon"
-          @click="executeCustomAction(index)"
-        />
-      </template>
-      <VueButton
-        v-tooltip="'Refresh'"
-        class="icon-button flat"
-        icon-left="refresh"
-        @click="refreshInspector()"
-      />
-    </portal>
   </div>
   <EmptyPane
     v-else
@@ -149,14 +156,12 @@ export default defineComponent({
 
 <style lang="postcss" scoped>
 .search {
-  >>> {
-    .input {
-      height: 39px !important;
-    }
+  :deep(.input) {
+    height: 39px !important;
+  }
 
-    .content {
-      border: none !important;
-    }
+  :deep(.content) {
+    border: none !important;
   }
 }
 

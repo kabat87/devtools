@@ -40,17 +40,17 @@ const app = new Vue({
   },
   data: {
     obj: {
-      items: items,
+      items,
       circular,
     },
   },
-  render (h) {
+  render(h) {
     return h('div', null, [
       h(Counter),
       h(Target, { props: { msg: 'hi', ins: new MyClass() } }),
       h(Other),
       h(Events, { key: 'foo' }),
-      h(NativeTypes, { key: new Date() }),
+      h(NativeTypes, { key: new Date(), ref: 'nativeTypes' }),
       h(Router, { key: [] }),
       h(TransitionExample),
       h(VuexObject),
@@ -67,14 +67,24 @@ window.addEventListener('load', () => {
   app.$mount('#app')
 })
 
+const app2 = new Vue({
+  render(h) {
+    return h('div', null, [
+      h('h1', 'App 2'),
+      h(Other),
+    ])
+  },
+})
+app2.$mount('#app2')
+
 // custom element instance
 const ce = document.querySelector('#shadow')
 if (ce.attachShadow) {
   const shadowRoot = ce.attachShadow({ mode: 'open' })
 
   const ceVM = new Vue({
-    name: 'Shadow',
-    render (h) {
+    name: 'ShadowDom',
+    render(h) {
       return h('h2', 'Inside Shadow DOM!')
     },
   }).$mount()

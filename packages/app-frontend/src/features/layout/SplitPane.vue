@@ -1,7 +1,8 @@
 <script lang="ts">
-import { ref, computed, defineComponent, PropType, watch } from '@vue/composition-api'
+import type { PropType } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
+import { useLocalStorage } from '@vueuse/core'
 import { useOrientation } from './orientation'
-import { useSavedRef } from '@front/util/reactivity'
 
 export default defineComponent({
   props: {
@@ -23,7 +24,7 @@ export default defineComponent({
     draggerOffset: {
       type: String as PropType<'before' | 'center' | 'after'>,
       default: 'center',
-      validator: (value: any) => ['before', 'center', 'after'].includes(value),
+      validator: (value: string) => ['before', 'center', 'after'].includes(value),
     },
 
     saveId: {
@@ -42,31 +43,23 @@ export default defineComponent({
     },
   },
 
-  setup (props, { emit }) {
+  emits: ['leftCollapsed', 'rightCollapsed'],
+
+  setup(props, { emit }) {
     const { orientation } = useOrientation()
 
-    const split = ref(props.defaultSplit)
-    const leftCollapsed = ref(false)
-    const rightCollapsed = ref(false)
+    const split = props.saveId ? useLocalStorage(`split-pane-${props.saveId}`, props.defaultSplit) : ref(props.defaultSplit)
+    const leftCollapsed = props.saveId ? useLocalStorage(`split-pane-collapsed-left-${props.saveId}`, false) : ref(false)
+    const rightCollapsed = props.saveId ? useLocalStorage(`split-pane-collapsed-right-${props.saveId}`, false) : ref(false)
 
-    if (props.saveId) {
-      useSavedRef(split, `split-pane-${props.saveId}`)
-      if (props.collapsableLeft) {
-        useSavedRef(leftCollapsed, `split-pane-collapsed-left-${props.saveId}`)
-      }
-      if (props.collapsableRight) {
-        useSavedRef(rightCollapsed, `split-pane-collapsed-right-${props.saveId}`)
-      }
-    }
-
-    watch(leftCollapsed, value => {
-      emit('left-collapsed', value)
+    watch(leftCollapsed, (value) => {
+      emit('leftCollapsed', value)
     }, {
       immediate: true,
     })
 
-    watch(rightCollapsed, value => {
-      emit('right-collapsed', value)
+    watch(rightCollapsed, (value) => {
+      emit('rightCollapsed', value)
     }, {
       immediate: true,
     })
@@ -74,9 +67,11 @@ export default defineComponent({
     const boundSplit = computed(() => {
       if (split.value < props.min) {
         return props.min
-      } else if (split.value > props.max) {
+      }
+      else if (split.value > props.max) {
         return props.max
-      } else {
+      }
+      else {
         return split.value
       }
     })
@@ -94,20 +89,21 @@ export default defineComponent({
     let startSplit = 0
     const el = ref(null)
 
-    function dragStart (e: MouseEvent) {
+    function dragStart(e: MouseEvent) {
       dragging.value = true
       startPosition = orientation.value === 'landscape' ? e.pageX : e.pageY
       startSplit = boundSplit.value
     }
 
-    function dragMove (e: MouseEvent) {
+    function dragMove(e: MouseEvent) {
       if (dragging.value) {
         let position
         let totalSize
         if (orientation.value === 'landscape') {
           position = e.pageX
           totalSize = el.value.offsetWidth
-        } else {
+        }
+        else {
           position = e.pageY
           totalSize = el.value.offsetHeight
         }
@@ -116,24 +112,26 @@ export default defineComponent({
       }
     }
 
-    function dragEnd () {
+    function dragEnd() {
       dragging.value = false
     }
 
     // Collapsing
 
-    function collapseLeft () {
+    function collapseLeft() {
       if (rightCollapsed.value) {
         rightCollapsed.value = false
-      } else {
+      }
+      else {
         leftCollapsed.value = true
       }
     }
 
-    function collapseRight () {
+    function collapseRight() {
       if (leftCollapsed.value) {
         leftCollapsed.value = false
-      } else {
+      }
+      else {
         rightCollapsed.value = true
       }
     }
@@ -164,17 +162,17 @@ export default defineComponent({
       'flex-col meow': orientation === 'portrait',
       'cursor-ew-resize': dragging && orientation === 'landscape',
       'cursor-ns-resize': dragging && orientation === 'portrait',
-      [orientation]: true
+      [orientation]: true,
     }"
     @mousemove="dragMove"
     @mouseup="dragEnd"
     @mouseleave="dragEnd"
   >
     <div
-      class="relative top-0 left-0"
+      class="relative top-0 left-0 overflow-hidden"
       :class="{
         'pointer-events-none': dragging,
-        'border-r border-gray-200 dark:border-gray-800': orientation === 'landscape' && !leftCollapsed && !rightCollapsed,
+        'border-r border-gray-200 dark:border-gray-700': orientation === 'landscape' && !leftCollapsed && !rightCollapsed,
       }"
       :style="leftStyle"
     >
@@ -189,7 +187,7 @@ export default defineComponent({
         :class="{
           'top-0 bottom-0 cursor-ew-resize': orientation === 'landscape',
           'left-0 right-0 cursor-ns-resize': orientation === 'portrait',
-          [`dragger-offset-${draggerOffset}`]: true
+          [`dragger-offset-${draggerOffset}`]: true,
         }"
         @mousedown.prevent="dragStart"
       />
@@ -202,18 +200,27 @@ export default defineComponent({
           'left-0 right-0 bottom-0 flex-col': orientation === 'portrait',
         }"
       >
-        <VueButton
-          :icon-left="orientation === 'landscape' ? 'arrow_left': 'arrow_drop_up'"
-          class="block icon-button flat pointer-events-auto opacity-40 hover:opacity-100"
+        <button
+          v-tooltip="rightCollapsed ? `Expand ${orientation === 'landscape' ? 'Right' : 'Bottom'} pane` : `Collapse ${orientation === 'landscape' ? 'Left' : 'Top'} pane`"
+          class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 flex items-center justify-center w-2.5 h-6 rounded overflow-hidden pointer-events-auto opacity-70 hover:opacity-100"
+          :class="{
+            'rounded-r-none border-r-0': orientation === 'landscape',
+            'rounded-b-none border-b-0': orientation === 'portrait',
+          }"
           @click="collapseLeft()"
-        />
+        >
+          <VueIcon
+            :icon="orientation === 'landscape' ? 'arrow_left' : 'arrow_drop_up'"
+            class="flex-none w-5 h-5"
+          />
+        </button>
       </div>
     </div>
     <div
       class="relative bottom-0 right-0"
       :class="{
         'pointer-events-none': dragging,
-        'border-t border-gray-200 dark:border-gray-800': orientation === 'portrait'
+        'border-t border-gray-200 dark:border-gray-700': orientation === 'portrait',
       }"
       :style="rightStyle"
     >
@@ -225,11 +232,20 @@ export default defineComponent({
           'left-0 right-0 top-0 flex-col': orientation === 'portrait',
         }"
       >
-        <VueButton
-          :icon-left="orientation === 'landscape' ? 'arrow_right': 'arrow_drop_down'"
-          class="block icon-button flat pointer-events-auto opacity-40 hover:opacity-100"
+        <button
+          v-tooltip="leftCollapsed ? `Expand ${orientation === 'landscape' ? 'Left' : 'Top'} pane` : `Collapse ${orientation === 'landscape' ? 'Right' : 'Bottom'} pane`"
+          class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 flex items-center justify-center w-2.5 h-6 rounded overflow-hidden pointer-events-auto opacity-70 hover:opacity-100"
+          :class="{
+            'rounded-l-none border-l-0': orientation === 'landscape',
+            'rounded-t-none border-t-0': orientation === 'portrait',
+          }"
           @click="collapseRight()"
-        />
+        >
+          <VueIcon
+            :icon="orientation === 'landscape' ? 'arrow_right' : 'arrow_drop_down'"
+            class="flex-none w-5 h-5"
+          />
+        </button>
       </div>
 
       <slot
@@ -282,11 +298,9 @@ export default defineComponent({
 }
 
 .collapse-btn {
-  .icon-button {
-    @apply w-2.5 h-6 rounded-sm !important;
-
+  button {
     .portrait & {
-      @apply w-6 h-2.5 !important;
+      @apply w-6 h-2.5;
     }
   }
 }

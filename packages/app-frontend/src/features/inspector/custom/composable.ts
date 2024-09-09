@@ -1,7 +1,8 @@
-import { ref, computed } from '@vue/composition-api'
-import { useRoute } from '@front/util/router'
+import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useApps } from '@front/features/apps'
-import { BridgeEvents, parse, searchDeepInObject, getStorage, setStorage, Bridge } from '@vue-devtools/shared-utils'
+import type { Bridge } from '@vue-devtools/shared-utils'
+import { BridgeEvents, getStorage, parse, searchDeepInObject, setStorage } from '@vue-devtools/shared-utils'
 import { getBridge, useBridge } from '@front/features/bridge'
 
 export interface InspectorFromBackend {
@@ -14,6 +15,10 @@ export interface InspectorFromBackend {
   stateFilterPlaceholder: string
   noSelectionText: string
   actions?: {
+    icon: string
+    tooltip?: string
+  }[]
+  nodeActions?: {
     icon: string
     tooltip?: string
   }[]
@@ -32,7 +37,7 @@ export interface Inspector extends InspectorFromBackend {
 const SELECTED_NODES_STORAGE = 'custom-inspector-selected-nodes'
 let selectedIdsStorage = {}
 
-function inspectorFactory (options: InspectorFromBackend): Inspector {
+function inspectorFactory(options: InspectorFromBackend): Inspector {
   return {
     ...options,
     rootNodes: [],
@@ -47,7 +52,7 @@ function inspectorFactory (options: InspectorFromBackend): Inspector {
 
 const inspectors = ref<Inspector[]>([])
 
-export function useInspectors () {
+export function useInspectors() {
   const { currentAppId } = useApps()
   const currentAppInspectors = computed(() => inspectors.value.filter(i => i.appId === currentAppId.value))
 
@@ -56,32 +61,33 @@ export function useInspectors () {
   }
 }
 
-export function useCurrentInspector () {
+export function useCurrentInspector() {
   const route = useRoute()
   const { inspectors } = useInspectors()
   const { bridge } = useBridge()
 
-  const currentInspector = computed(() => inspectors.value.find(i => i.id === route.value.params.inspectorId))
+  const currentInspector = computed(() => inspectors.value.find(i => i.id === route.params.inspectorId))
 
   const filteredState = computed(() => {
-    if (currentInspector.value.stateFilter) {
+    if (currentInspector.value?.stateFilter) {
       const result = {}
       for (const groupKey in currentInspector.value.state) {
         const group = currentInspector.value.state[groupKey]
         const groupFields = group.filter(el => searchDeepInObject({
           [el.key]: el.value,
-        }, currentInspector.value.stateFilter))
+        }, currentInspector.value?.stateFilter))
         if (groupFields.length) {
           result[groupKey] = groupFields
         }
       }
       return result
-    } else {
-      return currentInspector.value.state
+    }
+    else {
+      return currentInspector.value?.state
     }
   })
 
-  function selectNode (node) {
+  function selectNode(node) {
     currentInspector.value.selectedNodeId = node.id
     currentInspector.value.selectedNode = node
     selectedIdsStorage[currentInspector.value.id] = node.id
@@ -89,20 +95,20 @@ export function useCurrentInspector () {
     fetchState(currentInspector.value)
   }
 
-  function refreshInspector () {
+  function refreshInspector() {
     refreshTree()
     refreshState()
   }
 
-  function refreshTree () {
+  function refreshTree() {
     fetchTree(currentInspector.value)
   }
 
-  function refreshState () {
+  function refreshState() {
     fetchState(currentInspector.value)
   }
 
-  function editState (path: string, payload: any, type: string) {
+  function editState(path: string, payload: any, type: string) {
     bridge.send(BridgeEvents.TO_BACK_CUSTOM_INSPECTOR_EDIT_STATE, {
       inspectorId: currentInspector.value.id,
       appId: currentInspector.value.appId,
@@ -124,12 +130,14 @@ export function useCurrentInspector () {
   }
 }
 
-function fetchInspectors () {
+function fetchInspectors() {
   getBridge().send(BridgeEvents.TO_BACK_CUSTOM_INSPECTOR_LIST, {})
 }
 
-function fetchTree (inspector: Inspector) {
-  if (!inspector) return
+function fetchTree(inspector: Inspector) {
+  if (!inspector) {
+    return
+  }
   getBridge().send(BridgeEvents.TO_BACK_CUSTOM_INSPECTOR_TREE, {
     inspectorId: inspector.id,
     appId: inspector.appId,
@@ -137,8 +145,10 @@ function fetchTree (inspector: Inspector) {
   })
 }
 
-function fetchState (inspector: Inspector) {
-  if (!inspector || !inspector.selectedNodeId) return
+function fetchState(inspector: Inspector) {
+  if (!inspector || !inspector.selectedNodeId) {
+    return
+  }
   getBridge().send(BridgeEvents.TO_BACK_CUSTOM_INSPECTOR_STATE, {
     inspectorId: inspector.id,
     appId: inspector.appId,
@@ -146,16 +156,16 @@ function fetchState (inspector: Inspector) {
   })
 }
 
-export function resetInspectors () {
+export function resetInspectors() {
   inspectors.value = []
   fetchInspectors()
 }
 
-export function setupCustomInspectorBridgeEvents (bridge: Bridge) {
+export function setupCustomInspectorBridgeEvents(bridge: Bridge) {
   selectedIdsStorage = getStorage(SELECTED_NODES_STORAGE, {})
 
   bridge.on(BridgeEvents.TO_FRONT_CUSTOM_INSPECTOR_LIST, ({ inspectors: list }) => {
-    list.forEach(inspector => {
+    list.forEach((inspector) => {
       if (!inspectors.value.some(i => i.id === inspector.id && i.appId === inspector.appId)) {
         inspectors.value.push(inspectorFactory(inspector))
       }
