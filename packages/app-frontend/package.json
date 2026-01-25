@@ -11,7 +11,7 @@
     "@vue/ui": "^0.12.5",
     "circular-json-es6": "^2.0.2",
     "d3": "^5.16.0",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.23",
     "lru-cache": "^5.1.1",
     "monaco-editor": "^0.24.0",
     "pixi.js-legacy": "^6.2.0",
